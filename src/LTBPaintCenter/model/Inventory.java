@@ -1,8 +1,6 @@
 package LTBPaintCenter.model;
 
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 public class Inventory {
     private Map<String, Product> map = new LinkedHashMap<>();

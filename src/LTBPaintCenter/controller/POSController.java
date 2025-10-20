@@ -1,23 +1,25 @@
 package LTBPaintCenter.controller;
 
-import javax.swing.*;
-import java.util.ArrayList;
-import java.util.List;
-
 import LTBPaintCenter.model.*;
 import LTBPaintCenter.view.*;
+import javax.swing.*;
+import java.util.*;
 
 public class POSController {
     private Inventory inventory;
     private Report report;
     private POSPanel view;
     private List<SaleItem> cart = new ArrayList<>();
+    private InventoryController inventoryController;
 
     public POSController(Inventory inv, Report rep) {
-        this.inventory = inv; this.report = rep; this.view = new POSPanel();
+        this.inventory = inv;
+        this.report = rep;
+        this.view = new POSPanel();
         attachListeners();
     }
 
+    public void setInventoryController(InventoryController ic) { this.inventoryController = ic; }
     public JPanel getView() { return view; }
 
     private void attachListeners() {
@@ -30,17 +32,42 @@ public class POSController {
         String id = view.tfProductId.getText().trim();
         int qty;
         try { qty = Integer.parseInt(view.tfQty.getText().trim()); }
-        catch (Exception ex) { JOptionPane.showMessageDialog(view, "Invalid qty"); return; }
+        catch (Exception ex) { JOptionPane.showMessageDialog(view, "Invalid quantity"); return; }
+
         Product p = inventory.getProduct(id);
         if (p == null) { JOptionPane.showMessageDialog(view, "Product not found"); return; }
-        if (qty <= 0 || qty > p.getQuantity()) { JOptionPane.showMessageDialog(view, "Quantity invalid or out of stock"); return; }
+        if (qty <= 0 || qty > p.getQuantity()) {
+            JOptionPane.showMessageDialog(view, "Quantity invalid or exceeds stock"); return;
+        }
 
-        // add to cart (no merge logic for simplicity)
-        SaleItem it = new SaleItem(p.getId(), p.getName(), p.getPrice(), qty);
-        cart.add(it);
-        view.tableModel.addRow(new Object[]{it.getProductId(), it.getName(), String.format("%.2f", it.getPrice()), it.getQty(), String.format("%.2f", it.getSubtotal())});
+        Optional<SaleItem> existing = cart.stream()
+                .filter(it -> it.getProductId().equals(id))
+                .findFirst();
+
+        if (existing.isPresent()) {
+            SaleItem it = existing.get();
+            it = new SaleItem(p.getId(), p.getName(), p.getPrice(), it.getQty() + qty);
+            cart.removeIf(x -> x.getProductId().equals(id));
+            cart.add(it);
+        } else {
+            cart.add(new SaleItem(p.getId(), p.getName(), p.getPrice(), qty));
+        }
+        refreshCartTable();
+        view.tfProductId.setText("");
+        view.tfQty.setText("");
+    }
+
+    private void refreshCartTable() {
+        var m = view.tableModel;
+        for (int i = m.getRowCount()-1; i>=0; --i) m.removeRow(i);
+        for (SaleItem it : cart) {
+            m.addRow(new Object[]{
+                    it.getProductId(), it.getName(),
+                    String.format("%.2f", it.getPrice()),
+                    it.getQty(), String.format("%.2f", it.getSubtotal())
+            });
+        }
         updateTotalLabel();
-        view.tfProductId.setText(""); view.tfQty.setText("");
     }
 
     private void updateTotalLabel() {
@@ -48,15 +75,17 @@ public class POSController {
         view.lblTotal.setText(String.format("Total: ₱%.2f", total));
     }
 
-    private void clearCart() {
-        cart.clear();
-        int rows = view.tableModel.getRowCount();
-        for (int i = rows -1; i >=0; --i) view.tableModel.removeRow(i);
-        updateTotalLabel();
-    }
+    private void clearCart() { cart.clear(); refreshCartTable(); }
 
     private void checkout() {
         if (cart.isEmpty()) { JOptionPane.showMessageDialog(view, "Cart is empty"); return; }
+
+        double total = cart.stream().mapToDouble(SaleItem::getSubtotal).sum();
+        int confirm = JOptionPane.showConfirmDialog(view,
+                String.format("Total: ₱%.2f\nConfirm checkout?", total),
+                "Confirm Checkout", JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) return;
+
         String saleId = "S" + (report.getSales().size() + 1);
         Sale sale = new Sale(saleId);
         for (SaleItem it : cart) {
@@ -64,7 +93,8 @@ public class POSController {
             inventory.updateQuantity(it.getProductId(), -it.getQty());
         }
         report.recordSale(sale);
-        JOptionPane.showMessageDialog(view, String.format("Sale recorded. Total: ₱%.2f", sale.getTotal()));
         clearCart();
+
+        if (inventoryController != null) inventoryController.refreshTable();
     }
 }

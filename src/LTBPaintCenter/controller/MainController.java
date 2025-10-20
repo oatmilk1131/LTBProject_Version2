@@ -3,6 +3,7 @@ package LTBPaintCenter.controller;
 import LTBPaintCenter.model.*;
 import LTBPaintCenter.view.*;
 import javax.swing.*;
+import java.awt.*;
 
 public class MainController {
     private Inventory inventory;
@@ -19,7 +20,8 @@ public class MainController {
 
         posController = new POSController(inventory, report);
         inventoryController = new InventoryController(inventory);
-        monitoringController = new MonitoringController(report, inventory);
+        posController.setInventoryController(inventoryController);
+        monitoringController = new MonitoringController(report);
 
         frame = new MainFrame();
         frame.addView(posController.getView(), "POS");
@@ -34,12 +36,9 @@ public class MainController {
         menu.add(miPOS); menu.add(miInv); menu.add(miMon);
         mb.add(menu);
 
-        miPOS.addActionListener(e -> frame.showView("POS"));
-        miInv.addActionListener(e -> frame.showView("Inventory"));
-        miMon.addActionListener(e -> {
-            monitoringController.refresh();
-            frame.showView("Monitoring");
-        });
+        miPOS.addActionListener(e->frame.showView("POS"));
+        miInv.addActionListener(e->frame.showView("Inventory"));
+        miMon.addActionListener(e->{ monitoringController.refresh(); frame.showView("Monitoring"); });
 
         frame.showView("POS");
         frame.setVisible(true);

@@ -23,6 +23,7 @@ public class InventoryPanel extends JPanel {
         form.add(new JLabel("Qty:")); form.add(tfQty);
         form.add(btnAdd); form.add(btnDelete);
         add(form, BorderLayout.NORTH);
+
         add(new JScrollPane(table), BorderLayout.CENTER);
     }
 }
