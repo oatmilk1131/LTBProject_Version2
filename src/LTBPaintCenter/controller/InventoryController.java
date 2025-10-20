@@ -10,57 +10,54 @@ public class InventoryController {
     private Inventory inventory;
     private InventoryPanel view;
 
-    public InventoryController(Inventory inventory) {
-        this.inventory = inventory;
-        this.view = new InventoryPanel();
-
+    public InventoryController(Inventory inv, InventoryPanel inventoryPanel){
+        inventory = inv;
+        view = new InventoryPanel();
         attachListeners();
-        refreshInventory(); // initial load
+        refreshInventory();
     }
 
-    public InventoryPanel getView() {
-        return view;
+    public InventoryPanel getView(){ return view; }
+
+    private void attachListeners(){
+        view.setAddOrUpdateListener(this::addOrUpdate);
+        view.setDeleteListener(this::delete);
     }
 
-    private void attachListeners() {
-        view.setAddOrUpdateListener(() -> addOrUpdate());
-        view.setDeleteListener(() -> delete());
-    }
-
-    public void refreshInventory() {
+    public void refreshInventory(){
         Collection<Product> allProducts = inventory.getAll();
         view.refreshInventory(allProducts);
     }
 
-    private void addOrUpdate() {
+    private void addOrUpdate(){
         String id = view.getIdField().getText().trim();
         String name = view.getNameField().getText().trim();
         double price;
         int qty;
-
-        try {
+        try{
             price = Double.parseDouble(view.getPriceField().getText().trim());
             qty = Integer.parseInt(view.getQtyField().getText().trim());
-        } catch (Exception e) {
-            javax.swing.JOptionPane.showMessageDialog(view, "Invalid price or quantity");
+        } catch(Exception e){
+            javax.swing.JOptionPane.showMessageDialog(view,"Invalid price or quantity");
             return;
         }
 
         Product existing = inventory.getProduct(id);
-        if (existing != null) {
+        if(existing != null){
             existing.setName(name);
             existing.setPrice(price);
             existing.setQuantity(qty);
         } else {
-            inventory.addProduct(new Product(id, name, price, qty));
+            inventory.addProduct(new Product(id,name,price,qty));
         }
+
         refreshInventory();
     }
 
-    private void delete() {
+    private void delete(){
         String id = view.getIdField().getText().trim();
-        if (id.isEmpty()) {
-            javax.swing.JOptionPane.showMessageDialog(view, "Select a product first");
+        if(id.isEmpty()){
+            javax.swing.JOptionPane.showMessageDialog(view,"Select a product first");
             return;
         }
         inventory.removeProduct(id);

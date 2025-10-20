@@ -2,9 +2,9 @@ package LTBPaintCenter.controller;
 
 import LTBPaintCenter.model.Inventory;
 import LTBPaintCenter.model.Product;
+import LTBPaintCenter.model.Report;
 import LTBPaintCenter.model.Sale;
 import LTBPaintCenter.model.SaleItem;
-import LTBPaintCenter.model.Report;
 import LTBPaintCenter.view.POSPanel;
 
 import javax.swing.*;
@@ -15,88 +15,85 @@ public class POSController {
     private Inventory inventory;
     private Report report;
     private POSPanel view;
-    private List<SaleItem> cart = new ArrayList<>();
+    private List<SaleItem> cart;
 
-    public POSController(Inventory inventory, Report report) {
-        this.inventory = inventory;
-        this.report = report;
-        this.view = new POSPanel();
+    public POSController(Inventory inv, Report rep, POSPanel posPanel){
+        inventory = inv;
+        report = rep;
+        view = new POSPanel();
+        cart = new ArrayList<>();
         attachListeners();
+        refreshPOS();
     }
 
-    public POSPanel getView() {
-        return view;
-    }
+    public POSPanel getView(){ return view; }
+    public List<SaleItem> getCart(){ return cart; }
 
-    private void attachListeners() {
+    private void attachListeners(){
+        view.setCheckoutListener(e -> checkout());
+        view.setClearCartListener(e -> clearCart());
+        // Pass Product to the listener
         view.setAddToCartListener(this::promptAddToCart);
-        view.setCheckoutListener(this::checkout);
-        view.setClearCartListener(this::clearCart);
     }
 
-    public void refreshPOS() {
+    public void refreshPOS(){
         view.refreshProducts(inventory.getAll(), cart);
+        view.updateSubtotal(cart);
     }
 
-    private void promptAddToCart(Product product) {
-        // Quantity dialog with - x + style
-        SpinnerNumberModel model = new SpinnerNumberModel(1, 1, product.getQuantity(), 1);
-        JSpinner spinner = new JSpinner(model);
-        int option = JOptionPane.showConfirmDialog(
-                view,
-                spinner,
-                "Enter quantity for " + product.getName(),
-                JOptionPane.OK_CANCEL_OPTION,
-                JOptionPane.PLAIN_MESSAGE
-        );
+    // This method now receives the Product as parameter
+    private void promptAddToCart(Product selected){
+        if(selected == null) return;
 
-        if (option == JOptionPane.OK_OPTION) {
-            int qty = (int) spinner.getValue();
-            if (qty <= 0 || qty > product.getQuantity()) {
-                JOptionPane.showMessageDialog(view, "Invalid quantity.");
-                return;
-            }
-
-            // Check if already in cart
-            SaleItem existing = cart.stream()
-                    .filter(i -> i.getProductId().equals(product.getId()))
-                    .findFirst()
-                    .orElse(null);
-
-            if (existing != null) {
-                if (existing.getQty() + qty > product.getQuantity()) {
-                    JOptionPane.showMessageDialog(view, "Cannot exceed stock quantity.");
-                    return;
-                }
-                existing.addQuantity(qty);
-            } else {
-                cart.add(new SaleItem(product.getId(), product.getName(), product.getPrice(), qty));
-            }
-            refreshPOS();
-        }
-    }
-
-    private void checkout() {
-        if (cart.isEmpty()) {
-            JOptionPane.showMessageDialog(view, "Cart is empty.");
+        int maxQty = selected.getQuantity();
+        if(maxQty == 0){
+            JOptionPane.showMessageDialog(view,"Out of stock");
             return;
         }
 
-        String saleId = "S" + (report.getSales().size() + 1);
-        Sale sale = new Sale(saleId);
+        String qtyStr = JOptionPane.showInputDialog(view,"Enter quantity (max "+maxQty+")","1");
+        if(qtyStr == null) return;
+        int qty;
+        try{ qty = Integer.parseInt(qtyStr); } catch(Exception e){ return; }
+        if(qty <= 0 || qty > maxQty){
+            JOptionPane.showMessageDialog(view,"Invalid quantity");
+            return;
+        }
 
-        for (SaleItem it : cart) {
+        // Add or merge cart
+        SaleItem existing = cart.stream().filter(it->it.getProductId().equals(selected.getId())).findFirst().orElse(null);
+        if(existing != null){
+            if(existing.getQty() + qty > selected.getQuantity()){
+                JOptionPane.showMessageDialog(view,"Quantity exceeds stock");
+                return;
+            }
+            existing.addQuantity(qty);
+        } else {
+            cart.add(new SaleItem(selected.getId(),selected.getName(),selected.getPrice(),qty));
+        }
+
+        refreshPOS();
+    }
+
+    private void clearCart(){
+        cart.clear();
+        refreshPOS();
+    }
+
+    private void checkout(){
+        if(cart.isEmpty()){
+            JOptionPane.showMessageDialog(view,"Cart is empty");
+            return;
+        }
+
+        String saleId = "S"+(report.getSales().size()+1);
+        Sale sale = new Sale(saleId);
+        for(SaleItem it: cart){
             sale.addItem(it);
             inventory.updateQuantity(it.getProductId(), -it.getQty());
         }
-
         report.recordSale(sale);
-        JOptionPane.showMessageDialog(view, String.format("Sale recorded. Total: ₱%.2f", sale.getTotal()));
+        JOptionPane.showMessageDialog(view,"Sale recorded. Total: ₱"+String.format("%.2f", sale.getTotal()));
         clearCart();
-    }
-
-    private void clearCart() {
-        cart.clear();
-        refreshPOS();
     }
 }
