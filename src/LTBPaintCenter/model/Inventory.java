@@ -12,6 +12,21 @@ public class Inventory {
 
     public void updateQuantity(String id, int delta) {
         Product p = map.get(id);
-        if (p != null) p.setQuantity(p.getQuantity() + delta);
+        if (p != null) {
+            int newQty = p.getQuantity() + delta;
+            if (newQty < 0) newQty = 0;
+            p.setQuantity(newQty);
+        }
+    }
+
+    // Phase 2 addition: get total sold per product
+    public Map<String, Integer> getTotalSold(Map<String,Integer> cumulativeSales) {
+        Map<String, Integer> result = new LinkedHashMap<>();
+        for (var entry : map.entrySet()) {
+            String id = entry.getKey();
+            int sold = cumulativeSales.getOrDefault(id, 0);
+            result.put(id, sold);
+        }
+        return result;
     }
 }

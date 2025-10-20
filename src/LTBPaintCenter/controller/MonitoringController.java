@@ -23,12 +23,9 @@ public class MonitoringController {
     private void attachListeners() {
         view.table.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) {
+                if(e.getClickCount()==2) {
                     int row = view.table.getSelectedRow();
-                    if (row >=0 ) {
-                        String saleId = view.model.getValueAt(row,0).toString();
-                        showSaleDetails(saleId);
-                    }
+                    if(row>=0) showSaleDetails(view.model.getValueAt(row,0).toString());
                 }
             }
         });
@@ -36,7 +33,7 @@ public class MonitoringController {
 
     private void showSaleDetails(String saleId) {
         Sale sale = report.getSales().stream().filter(s->s.getId().equals(saleId)).findFirst().orElse(null);
-        if (sale == null) return;
+        if(sale==null) return;
         new SaleDetailDialog(null, sale.getItems(), saleId).setVisible(true);
     }
 
@@ -47,6 +44,7 @@ public class MonitoringController {
         for(Sale s : report.getSales()) {
             m.addRow(new Object[]{s.getId(), fmt.format(s.getDate()), String.format("%.2f", s.getTotal())});
         }
-        view.lblSummary.setText(String.format("Sales: %d | Revenue: ₱%.2f", report.getTotalSalesCount(), report.getTotalRevenue()));
+        view.lblSummary.setText(String.format("Sales: %d | Revenue: ₱%.2f",
+                report.getTotalSalesCount(), report.getTotalRevenue()));
     }
 }
