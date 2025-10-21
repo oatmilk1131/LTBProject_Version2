@@ -73,8 +73,7 @@ public class MonitoringController {
 
         List<Sale> filtered = new ArrayList<>();
         for (Sale s : report.getSales()) {
-            boolean withinDate = true;
-            if (dateFrom != null && s.getDate().before(dateFrom)) withinDate = false;
+            boolean withinDate = dateFrom == null || !s.getDate().before(dateFrom);
             if (dateTo != null && s.getDate().after(dateTo)) withinDate = false;
 
             boolean matchesBrand = true;

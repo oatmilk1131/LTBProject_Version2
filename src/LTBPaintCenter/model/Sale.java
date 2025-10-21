@@ -3,9 +3,9 @@ package LTBPaintCenter.model;
 import java.util.*;
 
 public class Sale {
-    private String saleId;
-    private Date date;
-    private List<SaleItem> items = new ArrayList<>();
+    private final String saleId;
+    private final Date date;
+    private final List<SaleItem> items = new ArrayList<>();
     private double total;
 
     public Sale(String saleId) {

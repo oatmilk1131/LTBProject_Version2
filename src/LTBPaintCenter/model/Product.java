@@ -1,7 +1,7 @@
 package LTBPaintCenter.model;
 
 public class Product {
-    private String id;
+    private final String id;
     private String name;
     private double price;
     private int quantity;

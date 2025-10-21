@@ -9,8 +9,8 @@ import java.util.List;
 
     //Main Controller, manages application flow between POS, Inventory and Monitoring
 public class MainController {
-    private Inventory inventory;
-    private Report report;
+    private final Inventory inventory;
+    private final Report report;
     private MainFrame frame;
 
     private POSController posController;

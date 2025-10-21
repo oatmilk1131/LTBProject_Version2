@@ -3,7 +3,7 @@ package LTBPaintCenter.model;
 import java.util.*;
 
 public class Inventory {
-    private Map<String, Product> map = new LinkedHashMap<>();
+    private final Map<String, Product> map = new LinkedHashMap<>();
 
     public void addProduct(Product p) { map.put(p.getId(), p); }
     public Product getProduct(String id) { return map.get(id); }

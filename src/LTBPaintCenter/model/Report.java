@@ -3,8 +3,8 @@ package LTBPaintCenter.model;
 import java.util.*;
 
 public class Report {
-    private List<Sale> sales = new ArrayList<>();
-    private Map<String,Integer> cumulativeProductSales = new HashMap<>();
+    private final List<Sale> sales = new ArrayList<>();
+    private final Map<String,Integer> cumulativeProductSales = new HashMap<>();
 
     public void recordSale(Sale s) {
         sales.add(s);
