@@ -7,6 +7,7 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.List;
 
@@ -22,8 +23,13 @@ public class MonitoringPanel extends JPanel {
     private final JLabel lblRevenue = new JLabel("Total Revenue: ₱0.00");
 
     private final JComboBox<String> cbFilterBrand = new JComboBox<>(new String[]{"All Brands"});
-    private final JTextField tfDateFrom = new JTextField(10);
-    private final JTextField tfDateTo = new JTextField(10);
+    private final JComboBox<String> cbFromDay = new JComboBox<>();
+    private final JComboBox<String> cbFromMonth = new JComboBox<>();
+    private final JComboBox<String> cbFromYear = new JComboBox<>();
+
+    private final JComboBox<String> cbToDay = new JComboBox<>();
+    private final JComboBox<String> cbToMonth = new JComboBox<>();
+    private final JComboBox<String> cbToYear = new JComboBox<>();
     private final JButton btnApplyFilter = new JButton("Apply");
     private final JButton btnClearFilter = new JButton("Clear");
 
@@ -48,22 +54,25 @@ public class MonitoringPanel extends JPanel {
 
         filterPanel.add(new JLabel("Brand:"));
         filterPanel.add(cbFilterBrand);
-        filterPanel.add(new JLabel("Date From (yyyy-MM-dd):"));
-        filterPanel.add(tfDateFrom);
+
+        // Date From selector
+        filterPanel.add(new JLabel("Date From:"));
+        addDateSelectors(filterPanel, cbFromDay, cbFromMonth, cbFromYear);
+
+        // Date To selector
         filterPanel.add(new JLabel("To:"));
-        filterPanel.add(tfDateTo);
-        filterPanel.add(btnApplyFilter);
+        addDateSelectors(filterPanel, cbToDay, cbToMonth, cbToYear);
 
-
-        JButton btnClearFilter = new JButton("Clear");
-        styleButton(btnClearFilter, new Color(108, 117, 125), Color.WHITE);
-        filterPanel.add(btnClearFilter);
-
+        // Buttons (use class fields)
         styleButton(btnApplyFilter, new Color(0, 120, 215), Color.WHITE);
+        styleButton(btnClearFilter, new Color(108, 117, 125), Color.WHITE);
 
+        filterPanel.add(btnApplyFilter);
+        filterPanel.add(btnClearFilter);
 
         add(filterPanel, BorderLayout.NORTH);
     }
+
 
     private void styleButton(JButton b, Color bg, Color fg) {
         b.setBackground(bg);
@@ -147,7 +156,31 @@ public class MonitoringPanel extends JPanel {
         lblRevenue.setText(String.format("Total Revenue: ₱%.2f", totalRevenue));
     }
 
-    // Future: use this to update brand dropdown dynamically
+    private void addDateSelectors(JPanel panel, JComboBox<String> cbDay, JComboBox<String> cbMonth, JComboBox<String> cbYear) {
+        // Days
+        cbDay.addItem("");
+        for (int i = 1; i <= 31; i++) cbDay.addItem(String.valueOf(i));
+        cbDay.setPreferredSize(new Dimension(50, 25));
+        panel.add(cbDay);
+
+        // Months
+        cbMonth.addItem("");
+        String[] months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        for (String m : months) cbMonth.addItem(m);
+        cbMonth.setPreferredSize(new Dimension(70, 25));
+        panel.add(cbMonth);
+
+        // Years
+        cbYear.addItem("");
+        for (int y = 2020; y <= 2026; y++) cbYear.addItem(String.valueOf(y));
+        cbYear.setPreferredSize(new Dimension(70, 25));
+        panel.add(cbYear);
+
+        // default to current year
+        int currentYear = Calendar.getInstance().get(Calendar.YEAR);
+        cbYear.setSelectedItem(String.valueOf(currentYear));
+    }
+
     public void populateBrandFilter(Collection<String> brands) {
         cbFilterBrand.removeAllItems();
         cbFilterBrand.addItem("All Brands");
@@ -155,8 +188,18 @@ public class MonitoringPanel extends JPanel {
     }
 
     public JButton getBtnApplyFilter() { return btnApplyFilter; }
-    public JComboBox<String> getCbFilterBrand() { return cbFilterBrand; }
-    public JTextField getTfDateFrom() { return tfDateFrom; }
-    public JTextField getTfDateTo() { return tfDateTo; }
     public JButton getBtnClearFilter() { return btnClearFilter; }
+    public JComboBox<String> getCbFilterBrand() { return cbFilterBrand; }
+    public String getFromDay()   { return (String) cbFromDay.getSelectedItem(); }
+    public String getFromMonth() { return (String) cbFromMonth.getSelectedItem(); }
+    public String getFromYear()  { return (String) cbFromYear.getSelectedItem(); }
+    public String getToDay()   { return (String) cbToDay.getSelectedItem(); }
+    public String getToMonth() { return (String) cbToMonth.getSelectedItem(); }
+    public String getToYear()  { return (String) cbToYear.getSelectedItem(); }
+    public JComboBox<String> getCbFromDay()   { return cbFromDay; }
+    public JComboBox<String> getCbFromMonth() { return cbFromMonth; }
+    public JComboBox<String> getCbFromYear()  { return cbFromYear; }
+    public JComboBox<String> getCbToDay()   { return cbToDay; }
+    public JComboBox<String> getCbToMonth() { return cbToMonth; }
+    public JComboBox<String> getCbToYear()  { return cbToYear; }
 }

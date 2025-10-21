@@ -18,7 +18,6 @@ public class MonitoringController {
         this.report = report;
         this.inventory = inventory;
         this.view = new MonitoringPanel();
-
         attachListeners();
         populateBrandFilter();
         refresh();
@@ -51,23 +50,16 @@ public class MonitoringController {
     // ---------------------------------------------
     private void applyFilters() {
         String selectedBrand = Objects.requireNonNull(view.getCbFilterBrand().getSelectedItem()).toString();
-        String dateFromStr = view.getTfDateFrom().getText().trim();
-        String dateToStr = view.getTfDateTo().getText().trim();
 
-        Date dateFrom = null, dateTo = null;
-        try {
-            if (!dateFromStr.isEmpty()) dateFrom = fmt.parse(dateFromStr);
-            if (!dateToStr.isEmpty()) {
-                dateTo = fmt.parse(dateToStr);
-                // include entire last day
-                Calendar cal = Calendar.getInstance();
-                cal.setTime(dateTo);
-                cal.add(Calendar.DAY_OF_MONTH, 1);
-                cal.add(Calendar.SECOND, -1);
-                dateTo = cal.getTime();
-            }
-        } catch (ParseException ex) {
-            JOptionPane.showMessageDialog(view, "Invalid date format. Use yyyy-MM-dd");
+        Date dateFrom = parseDateFromSelectors(
+                view.getFromDay(), view.getFromMonth(), view.getFromYear()
+        );
+        Date dateTo = parseDateFromSelectors(
+                view.getToDay(), view.getToMonth(), view.getToYear()
+        );
+
+        if (dateFrom != null && dateTo != null && dateFrom.after(dateTo)) {
+            JOptionPane.showMessageDialog(view, "Invalid date range: 'From' cannot be after 'To'.");
             return;
         }
 
@@ -88,16 +80,58 @@ public class MonitoringController {
 
             if (withinDate && matchesBrand) filtered.add(s);
         }
+
         view.refreshSales(filtered);
     }
 
-    private void clearFilters() {
-        // Reset filter inputs
-        view.getCbFilterBrand().setSelectedIndex(0);
-        view.getTfDateFrom().setText("");
-        view.getTfDateTo().setText("");
+    private Date parseDateFromSelectors(String day, String month, String year) {
+        if (day.isBlank() || month.isBlank() || year.isBlank()) return null;
 
-        // Refresh the table with all sales
+        try {
+            int d = Integer.parseInt(day);
+            int y = Integer.parseInt(year);
+            int m = switch (month) {
+                case "Jan" -> 0;
+                case "Feb" -> 1;
+                case "Mar" -> 2;
+                case "Apr" -> 3;
+                case "May" -> 4;
+                case "Jun" -> 5;
+                case "Jul" -> 6;
+                case "Aug" -> 7;
+                case "Sep" -> 8;
+                case "Oct" -> 9;
+                case "Nov" -> 10;
+                case "Dec" -> 11;
+                default -> 0;
+            };
+
+            Calendar cal = Calendar.getInstance();
+            cal.set(y, m, d, 0, 0, 0);
+            cal.set(Calendar.MILLISECOND, 0);
+            return cal.getTime();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void clearFilters() {
+        // Reset brands
+        if (view.getCbFilterBrand().getItemCount() > 0) {
+            view.getCbFilterBrand().setSelectedIndex(0);
+        }
+
+        // Reset "From"
+        if (view.getCbFromDay() != null)   view.getCbFromDay().setSelectedIndex(0);
+        if (view.getCbFromMonth() != null) view.getCbFromMonth().setSelectedIndex(0);
+        if (view.getCbFromYear() != null)  view.getCbFromYear().setSelectedIndex(0);
+
+        // Reset "To"
+        if (view.getCbToDay() != null)     view.getCbToDay().setSelectedIndex(0);
+        if (view.getCbToMonth() != null)   view.getCbToMonth().setSelectedIndex(0);
+        if (view.getCbToYear() != null)    view.getCbToYear().setSelectedIndex(0);
+
+        // Refresh the table
         refresh();
     }
 }
