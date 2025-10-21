@@ -24,6 +24,7 @@ public class InventoryPanel extends JPanel {
     private final JButton btnAddUpdate = new JButton("Add / Update");
     private final JButton btnDelete = new JButton("Delete");
     private final JButton btnClear = new JButton("Clear Fields");
+    private final JButton btnSearch = new JButton("Find");
 
     private final DefaultTableModel model = new DefaultTableModel(
             new String[]{"ID", "Name", "Brand", "Color", "Type", "Price", "Qty"}, 0
@@ -108,7 +109,6 @@ public class InventoryPanel extends JPanel {
         JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
         searchPanel.setBackground(Color.WHITE);
         JLabel lblSearch = new JLabel("Search:");
-        JButton btnSearch = new JButton("Find");
         styleButton(btnSearch, new Color(0, 120, 215), Color.WHITE);
         searchPanel.add(lblSearch);
         searchPanel.add(tfSearch);
@@ -233,4 +233,5 @@ public class InventoryPanel extends JPanel {
     public JButton getBtnDelete() { return btnDelete; }
     public JButton getBtnClear() { return btnClear; }
     public JTable getTable() { return table; }
+    public JButton getBtnSearch() { return btnSearch; }
 }

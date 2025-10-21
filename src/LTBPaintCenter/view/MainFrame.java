@@ -137,7 +137,7 @@ public class MainFrame extends JFrame {
                 String pass = new String(pf.getPassword());
                 if (pass.equals("admin123")) {
                     isAdmin = true;
-                    lblRole.setText("Admin Mode");
+                    lblRole.setText("Admin");
                     JOptionPane.showMessageDialog(this, "Admin mode activated!");
                 } else {
                     JOptionPane.showMessageDialog(this, "Incorrect password.", "Access Denied", JOptionPane.ERROR_MESSAGE);
@@ -147,7 +147,7 @@ public class MainFrame extends JFrame {
             int confirm = JOptionPane.showConfirmDialog(this, "Switch back to Cashier mode?", "Confirm", JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
                 isAdmin = false;
-                lblRole.setText("Cashier Mode");
+                lblRole.setText("Cashier");
                 JOptionPane.showMessageDialog(this, "Returned to Cashier mode.");
             }
         }
