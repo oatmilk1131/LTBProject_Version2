@@ -1,13 +1,12 @@
 package LTBPaintCenter.view;
 
 import LTBPaintCenter.controller.*;
-import LTBPaintCenter.model.Global;
-
 import javax.swing.*;
 import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
 
+    //Main application frame with sidebar navigation, admin toggle, and module panel management.
 public class MainFrame extends JFrame {
     private final JPanel mainPanel = new JPanel(new CardLayout());
     private final CardLayout cardLayout = (CardLayout) mainPanel.getLayout();
@@ -25,10 +24,9 @@ public class MainFrame extends JFrame {
     private boolean isAdmin = false;
     private final Map<String, JPanel> panelMap = new HashMap<>();
 
-    // Reference to controllers for refresh hooks
-    private POSController posController;
-    private InventoryController inventoryController;
-    private MonitoringController monitoringController;
+    private final POSController posController;
+    private final InventoryController inventoryController;
+    private final MonitoringController monitoringController;
 
     public MainFrame(POSController posCtrl, InventoryController invCtrl, MonitoringController monCtrl) {
         this.posController = posCtrl;
@@ -50,7 +48,6 @@ public class MainFrame extends JFrame {
         addPanel(inventoryController.getView(), "Inventory");
         addPanel(monitoringController.getView(), "Monitoring");
 
-        // Button actions
         btnPOS.addActionListener(e -> showPanel("POS"));
         btnInventory.addActionListener(e -> showPanel("Inventory"));
         btnMonitoring.addActionListener(e -> showPanel("Monitoring"));
@@ -64,7 +61,6 @@ public class MainFrame extends JFrame {
         sidebar.setBackground(new Color(240, 240, 240));
         sidebar.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, new Color(210, 210, 210)));
 
-        // Top section (profile + role label)
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setBackground(new Color(230, 230, 230));
         topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -85,7 +81,6 @@ public class MainFrame extends JFrame {
         topPanel.add(lblProfile, BorderLayout.CENTER);
         topPanel.add(lblRole, BorderLayout.SOUTH);
 
-        // Nav buttons
         navPanel.setBackground(new Color(240, 240, 240));
         styleSidebarButton(btnPOS);
         styleSidebarButton(btnInventory);
@@ -116,10 +111,6 @@ public class MainFrame extends JFrame {
         });
     }
 
-    // ---------------------------------
-    // Navigation
-    // ---------------------------------
-
     public void addPanel(JPanel panel, String name) {
         panelMap.put(name, panel);
         mainPanel.add(panel, name);
@@ -137,10 +128,6 @@ public class MainFrame extends JFrame {
 
         cardLayout.show(mainPanel, name);
     }
-
-    // ---------------------------------
-    // Role management
-    // ---------------------------------
 
     private void handleAdminToggle() {
         if (!isAdmin) {

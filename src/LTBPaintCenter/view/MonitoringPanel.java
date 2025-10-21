@@ -11,14 +11,18 @@ import java.util.Calendar;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * Monitoring panel for viewing sales records, applying filters,
+ * and visualizing revenue breakdown by brand or type.
+ */
 public class MonitoringPanel extends JPanel {
     private final DefaultTableModel tableModel = new DefaultTableModel(
             new String[]{"Sale ID", "Date", "Items", "Total (₱)"}, 0
     ) {
         @Override public boolean isCellEditable(int r, int c) { return false; }
     };
-    private final JTable table = new JTable(tableModel);
 
+    private final JTable table = new JTable(tableModel);
     private final JLabel lblTotalSales = new JLabel("Total Sales: 0");
     private final JLabel lblRevenue = new JLabel("Total Revenue: ₱0.00");
 
@@ -26,16 +30,15 @@ public class MonitoringPanel extends JPanel {
     private final JComboBox<String> cbFromDay = new JComboBox<>();
     private final JComboBox<String> cbFromMonth = new JComboBox<>();
     private final JComboBox<String> cbFromYear = new JComboBox<>();
-
     private final JComboBox<String> cbToDay = new JComboBox<>();
     private final JComboBox<String> cbToMonth = new JComboBox<>();
     private final JComboBox<String> cbToYear = new JComboBox<>();
+
     private final JButton btnApplyFilter = new JButton("Apply");
     private final JButton btnClearFilter = new JButton("Clear");
 
     private final JTextArea taBrandSummary = new JTextArea();
     private final JTextArea taTypeSummary = new JTextArea();
-
     private final JComboBox<String> cbChartMode = new JComboBox<>(new String[]{"Brand Revenue", "Type Revenue"});
     private final BarChartPanel barChartPanel = new BarChartPanel();
 
@@ -49,9 +52,7 @@ public class MonitoringPanel extends JPanel {
         initSummaryBar();
     }
 
-    // ------------------------------------------
     // FILTER BAR
-    // ------------------------------------------
     private void initTopFilters() {
         JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
         filterPanel.setBackground(Color.WHITE);
@@ -60,24 +61,19 @@ public class MonitoringPanel extends JPanel {
         filterPanel.add(new JLabel("Brand:"));
         filterPanel.add(cbFilterBrand);
 
-        // Date From selector
         filterPanel.add(new JLabel("Date From:"));
         addDateSelectors(filterPanel, cbFromDay, cbFromMonth, cbFromYear);
 
-        // Date To selector
         filterPanel.add(new JLabel("To:"));
         addDateSelectors(filterPanel, cbToDay, cbToMonth, cbToYear);
 
-        // Buttons (use class fields)
         styleButton(btnApplyFilter, new Color(0, 120, 215), Color.WHITE);
         styleButton(btnClearFilter, new Color(108, 117, 125), Color.WHITE);
 
         filterPanel.add(btnApplyFilter);
         filterPanel.add(btnClearFilter);
-
         add(filterPanel, BorderLayout.NORTH);
     }
-
 
     private void styleButton(JButton b, Color bg, Color fg) {
         b.setBackground(bg);
@@ -87,9 +83,28 @@ public class MonitoringPanel extends JPanel {
         b.setPreferredSize(new Dimension(90, 26));
     }
 
-    // ------------------------------------------
+    private void addDateSelectors(JPanel panel, JComboBox<String> cbDay, JComboBox<String> cbMonth, JComboBox<String> cbYear) {
+        cbDay.addItem("");
+        for (int i = 1; i <= 31; i++) cbDay.addItem(String.valueOf(i));
+        cbDay.setPreferredSize(new Dimension(50, 25));
+        panel.add(cbDay);
+
+        cbMonth.addItem("");
+        String[] months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        for (String m : months) cbMonth.addItem(m);
+        cbMonth.setPreferredSize(new Dimension(70, 25));
+        panel.add(cbMonth);
+
+        cbYear.addItem("");
+        for (int y = 2020; y <= 2026; y++) cbYear.addItem(String.valueOf(y));
+        cbYear.setPreferredSize(new Dimension(70, 25));
+        panel.add(cbYear);
+
+        int currentYear = Calendar.getInstance().get(Calendar.YEAR);
+        cbYear.setSelectedItem(String.valueOf(currentYear));
+    }
+
     // SALES TABLE
-    // ------------------------------------------
     private void initTable() {
         table.setRowHeight(26);
         table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
@@ -102,8 +117,7 @@ public class MonitoringPanel extends JPanel {
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
                                                            boolean hasFocus, int row, int column) {
                 Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                if (!isSelected)
-                    c.setBackground(row % 2 == 0 ? Color.WHITE : new Color(245, 245, 245));
+                if (!isSelected) c.setBackground(row % 2 == 0 ? Color.WHITE : new Color(245, 245, 245));
                 return c;
             }
         });
@@ -113,16 +127,13 @@ public class MonitoringPanel extends JPanel {
         add(scroll, BorderLayout.CENTER);
     }
 
-    // ------------------------------------------
-    // SUMMARY BAR
-    // ------------------------------------------
+    // SUMMARY SECTION
     private void initSummaryBar() {
         JPanel summaryContainer = new JPanel();
         summaryContainer.setLayout(new BoxLayout(summaryContainer, BoxLayout.Y_AXIS));
         summaryContainer.setBackground(Color.WHITE);
         summaryContainer.setBorder(BorderFactory.createTitledBorder("Sales Summary"));
 
-        // Top summary (totals)
         JPanel topSummary = new JPanel(new FlowLayout(FlowLayout.RIGHT, 20, 8));
         topSummary.setBackground(Color.WHITE);
         lblTotalSales.setFont(new Font("Segoe UI", Font.BOLD, 13));
@@ -131,50 +142,38 @@ public class MonitoringPanel extends JPanel {
         topSummary.add(lblRevenue);
         summaryContainer.add(topSummary);
 
-        // Brand summary
-        taBrandSummary.setEditable(false);
-        taBrandSummary.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        taBrandSummary.setBackground(new Color(248, 248, 248));
-        taBrandSummary.setBorder(BorderFactory.createTitledBorder("Revenue by Brand"));
-        taBrandSummary.setLineWrap(true);
-        taBrandSummary.setWrapStyleWord(true);
-        summaryContainer.add(taBrandSummary);
+        setupSummaryTextArea(taBrandSummary, "Revenue by Brand");
+        setupSummaryTextArea(taTypeSummary, "Revenue by Type");
 
-        // Type summary
-        taTypeSummary.setEditable(false);
-        taTypeSummary.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        taTypeSummary.setBackground(new Color(248, 248, 248));
-        taTypeSummary.setBorder(BorderFactory.createTitledBorder("Revenue by Type"));
-        taTypeSummary.setLineWrap(true);
-        taTypeSummary.setWrapStyleWord(true);
-        summaryContainer.add(taTypeSummary);
-
-        summaryContainer.add(Box.createVerticalStrut(10));
-
-        // Chart mode selector
         JPanel chartHeader = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 4));
         chartHeader.setBackground(Color.WHITE);
         chartHeader.add(new JLabel("Chart Mode:"));
         chartHeader.add(cbChartMode);
 
-        summaryContainer.add(Box.createVerticalStrut(10));
-        summaryContainer.add(chartHeader);
-
         barChartPanel.setBorder(BorderFactory.createTitledBorder("Visual Breakdown"));
+
+        summaryContainer.add(Box.createVerticalStrut(8));
+        summaryContainer.add(chartHeader);
         summaryContainer.add(barChartPanel);
 
         add(summaryContainer, BorderLayout.SOUTH);
     }
 
+    private void setupSummaryTextArea(JTextArea area, String title) {
+        area.setEditable(false);
+        area.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        area.setBackground(new Color(248, 248, 248));
+        area.setBorder(BorderFactory.createTitledBorder(title));
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        add(area);
+    }
 
-    // ------------------------------------------
-    // PUBLIC METHODS
-    // ------------------------------------------
+    // PUBLIC
     public void refreshSales(Collection<Sale> sales) {
         tableModel.setRowCount(0);
         double totalRevenue = 0;
         int totalSales = 0;
-
         SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
         for (Sale s : sales) {
@@ -182,8 +181,7 @@ public class MonitoringPanel extends JPanel {
             totalRevenue += s.getTotal();
 
             StringBuilder itemSummary = new StringBuilder();
-            List<SaleItem> items = s.getItems();
-            for (SaleItem it : items) {
+            for (SaleItem it : s.getItems()) {
                 itemSummary.append(it.getName()).append(" (x").append(it.getQty()).append("), ");
             }
             if (itemSummary.length() > 2) itemSummary.setLength(itemSummary.length() - 2);
@@ -200,31 +198,6 @@ public class MonitoringPanel extends JPanel {
         lblRevenue.setText(String.format("Total Revenue: ₱%.2f", totalRevenue));
     }
 
-    private void addDateSelectors(JPanel panel, JComboBox<String> cbDay, JComboBox<String> cbMonth, JComboBox<String> cbYear) {
-        // Days
-        cbDay.addItem("");
-        for (int i = 1; i <= 31; i++) cbDay.addItem(String.valueOf(i));
-        cbDay.setPreferredSize(new Dimension(50, 25));
-        panel.add(cbDay);
-
-        // Months
-        cbMonth.addItem("");
-        String[] months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-        for (String m : months) cbMonth.addItem(m);
-        cbMonth.setPreferredSize(new Dimension(70, 25));
-        panel.add(cbMonth);
-
-        // Years
-        cbYear.addItem("");
-        for (int y = 2020; y <= 2026; y++) cbYear.addItem(String.valueOf(y));
-        cbYear.setPreferredSize(new Dimension(70, 25));
-        panel.add(cbYear);
-
-        // default to current year
-        int currentYear = Calendar.getInstance().get(Calendar.YEAR);
-        cbYear.setSelectedItem(String.valueOf(currentYear));
-    }
-
     public void populateBrandFilter(Collection<String> brands) {
         cbFilterBrand.removeAllItems();
         cbFilterBrand.addItem("All Brands");
@@ -236,21 +209,22 @@ public class MonitoringPanel extends JPanel {
         taTypeSummary.setText(typeText);
     }
 
+    // GETTERS
     public JButton getBtnApplyFilter() { return btnApplyFilter; }
     public JButton getBtnClearFilter() { return btnClearFilter; }
     public JComboBox<String> getCbFilterBrand() { return cbFilterBrand; }
     public String getFromDay()   { return (String) cbFromDay.getSelectedItem(); }
     public String getFromMonth() { return (String) cbFromMonth.getSelectedItem(); }
     public String getFromYear()  { return (String) cbFromYear.getSelectedItem(); }
-    public String getToDay()   { return (String) cbToDay.getSelectedItem(); }
-    public String getToMonth() { return (String) cbToMonth.getSelectedItem(); }
-    public String getToYear()  { return (String) cbToYear.getSelectedItem(); }
+    public String getToDay()     { return (String) cbToDay.getSelectedItem(); }
+    public String getToMonth()   { return (String) cbToMonth.getSelectedItem(); }
+    public String getToYear()    { return (String) cbToYear.getSelectedItem(); }
     public JComboBox<String> getCbFromDay()   { return cbFromDay; }
     public JComboBox<String> getCbFromMonth() { return cbFromMonth; }
     public JComboBox<String> getCbFromYear()  { return cbFromYear; }
-    public JComboBox<String> getCbToDay()   { return cbToDay; }
-    public JComboBox<String> getCbToMonth() { return cbToMonth; }
-    public JComboBox<String> getCbToYear()  { return cbToYear; }
-    public BarChartPanel getBarChartPanel() { return barChartPanel; }
+    public JComboBox<String> getCbToDay()     { return cbToDay; }
+    public JComboBox<String> getCbToMonth()   { return cbToMonth; }
+    public JComboBox<String> getCbToYear()    { return cbToYear; }
+    public BarChartPanel getBarChartPanel()   { return barChartPanel; }
     public JComboBox<String> getCbChartMode() { return cbChartMode; }
 }

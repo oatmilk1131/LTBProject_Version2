@@ -12,11 +12,9 @@ import java.util.*;
 import java.util.List;
 
 public class POSPanel extends JPanel {
-    // Product area uses FlowLayout to keep cards square and not stretch vertically
     private final JPanel productGrid = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 12));
     private final JScrollPane productScroll = new JScrollPane(productGrid);
 
-    // Cart table
     private final DefaultTableModel cartTableModel = new DefaultTableModel(
             new String[]{"ID", "Name", "Price", "Qty", "Subtotal"}, 0
     ) {
@@ -34,13 +32,13 @@ public class POSPanel extends JPanel {
     private final LinkedHashMap<String, SaleItem> cart = new LinkedHashMap<>();
     private final Map<String, Product> productMap = new LinkedHashMap<>();
 
-    // Filters (ensure these are instance fields and initialized before refresh)
+    // Filters
     private final JComboBox<String> cbBrand = new JComboBox<>();
     private final JComboBox<String> cbColor = new JComboBox<>();
     private final JComboBox<String> cbType = new JComboBox<>();
     private boolean suppressFilterEvents = false;
 
-    // Checkout handler (controller sets)
+    // Checkout handler
     public interface CheckoutHandler { boolean handleCheckout(List<SaleItem> cartSnapshot); }
     private CheckoutHandler checkoutHandler = null;
 
@@ -49,19 +47,17 @@ public class POSPanel extends JPanel {
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         setBackground(Color.WHITE);
 
-        initFilterBar();   // create and add filters BEFORE any product refresh
+        initFilterBar();
         initProductArea();
         initCartArea();
 
-        // Wire filter listeners (safe — they check suppressFilterEvents)
+        // Wire filter listeners
         cbBrand.addActionListener(e -> { if (!suppressFilterEvents) updateProductGrid(productMap.values()); });
         cbColor.addActionListener(e -> { if (!suppressFilterEvents) updateProductGrid(productMap.values()); });
         cbType.addActionListener(e -> { if (!suppressFilterEvents) updateProductGrid(productMap.values()); });
     }
 
-    // ---------------------------
-    // Initialization
-    // ---------------------------
+    // Init
     private void initFilterBar() {
         JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
         filterPanel.setBackground(Color.WHITE);
@@ -83,13 +79,12 @@ public class POSPanel extends JPanel {
         add(filterPanel, BorderLayout.NORTH);
     }
 
-    private final JPanel gridContainer = new JPanel(); // wrapper for scroll content
+    private final JPanel gridContainer = new JPanel();
 
     private void initProductArea() {
         gridContainer.setLayout(new BorderLayout());
         gridContainer.setBackground(Color.WHITE);
 
-        // productGrid is embedded inside a wrapper panel for proper sizing
         productGrid.setBackground(Color.WHITE);
         productScroll.setViewportView(productGrid);
         productScroll.setBorder(BorderFactory.createTitledBorder("Available Products"));
@@ -99,7 +94,7 @@ public class POSPanel extends JPanel {
         gridContainer.add(productScroll, BorderLayout.CENTER);
         add(gridContainer, BorderLayout.CENTER);
 
-        // Responsive resizing: recalculates number of columns on window resize
+        // Responsive resizing
         productScroll.getViewport().addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
             public void componentResized(java.awt.event.ComponentEvent e) {
@@ -114,7 +109,6 @@ public class POSPanel extends JPanel {
         int cardWidth = 150 + 12; // 150px card + 12px gap
         int columns = Math.max(1, availableWidth / cardWidth);
 
-        // 4 is the ideal number of columns
         if (columns > 4) columns = 4;
 
         // Update layout dynamically
@@ -186,7 +180,7 @@ public class POSPanel extends JPanel {
             }
         });
 
-        // Double click to edit qty (optional)
+        // Di gumagana
         cartTable.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) editSelectedCartQty();
@@ -194,25 +188,16 @@ public class POSPanel extends JPanel {
         });
     }
 
-    // ---------------------------
-    // Public API
-    // ---------------------------
     public void setCheckoutHandler(CheckoutHandler handler) { this.checkoutHandler = handler; }
     public List<SaleItem> getCartSnapshot() { return new ArrayList<>(cart.values()); }
     public void clearCart() { cart.clear(); refreshCartTable(); }
 
-    /**
-     * Refreshes the product grid and repopulates filter dropdowns.
-     * Always safe to call (filters are created in constructor).
-     */
     public void refreshProducts(Collection<Product> products) {
         if (products == null) products = Collections.emptyList();
 
-        // update product map
         productMap.clear();
         for (Product p : products) productMap.put(p.getId(), p);
 
-        // populate filter sets
         Set<String> brands = new TreeSet<>();
         Set<String> colors = new TreeSet<>();
         Set<String> types = new TreeSet<>();
@@ -222,7 +207,7 @@ public class POSPanel extends JPanel {
             if (p.getType()  != null && !p.getType().isBlank())  types.add(p.getType());
         }
 
-        // populate combo boxes safely
+
         suppressFilterEvents = true;
         try {
             cbBrand.removeAllItems(); cbBrand.addItem("All Brands");
@@ -237,13 +222,12 @@ public class POSPanel extends JPanel {
             suppressFilterEvents = false;
         }
 
-        // finally update the grid (applies currently selected filter values)
+        // Update grid
         updateProductGrid(productMap.values());
-        //
         layoutGridToFitWidth();
     }
 
-    // update product grid using filter selections
+    // Update product grid using filter selections
     private void updateProductGrid(Collection<Product> products) {
         productGrid.removeAll();
 
@@ -265,9 +249,7 @@ public class POSPanel extends JPanel {
         productGrid.repaint();
     }
 
-    // ---------------------------
     // Product card & quantity dialog
-    // ---------------------------
     private JPanel createProductCard(Product p) {
         JPanel card = new JPanel(new BorderLayout());
         card.setPreferredSize(new Dimension(150, 150));
@@ -313,9 +295,7 @@ public class POSPanel extends JPanel {
         if (qty != null && qty > 0) addToCart(p, qty);
     }
 
-    // ---------------------------
     // Cart operations
-    // ---------------------------
     private void addToCart(Product p, int qty) {
         SaleItem existing = cart.get(p.getId());
         if (existing != null) existing.addQuantity(qty);
@@ -372,9 +352,7 @@ public class POSPanel extends JPanel {
         lblTotal.setText(String.format("Total: ₱%.2f", total));
     }
 
-    // ---------------------------
-    // Dialog
-    // ---------------------------
+    // Dialog box
     private static class QuantityDialog extends JDialog {
         private Integer result = null;
         private final JTextField txtQty;

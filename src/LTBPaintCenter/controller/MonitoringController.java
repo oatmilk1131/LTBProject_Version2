@@ -4,17 +4,18 @@ import LTBPaintCenter.model.*;
 import LTBPaintCenter.view.MonitoringPanel;
 
 import javax.swing.*;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+    //MonitoringController, handles sales filtering, summary updates, and revenue chart visualization.
 public class MonitoringController {
     private final Report report;
     private final Inventory inventory;
     private final MonitoringPanel view;
     private final SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd");
-    private Map<String, Double> brandTotals = new LinkedHashMap<>();
-    private Map<String, Double> typeTotals = new LinkedHashMap<>();
+
+    private final Map<String, Double> brandTotals = new LinkedHashMap<>();
+    private final Map<String, Double> typeTotals = new LinkedHashMap<>();
 
     public MonitoringController(Report report, Inventory inventory) {
         this.report = report;
@@ -25,13 +26,14 @@ public class MonitoringController {
         refresh();
     }
 
-    public JPanel getView() { return view; }
+    public JPanel getView() {
+        return view;
+    }
 
     private void attachListeners() {
         view.getBtnApplyFilter().addActionListener(e -> applyFilters());
         view.getBtnClearFilter().addActionListener(e -> clearFilters());
 
-        // ✅ Add chart mode toggle listener once
         view.getCbChartMode().addActionListener(e -> {
             String selected = (String) view.getCbChartMode().getSelectedItem();
             if ("Type Revenue".equals(selected)) {
@@ -40,6 +42,12 @@ public class MonitoringController {
                 view.getBarChartPanel().setData(brandTotals);
             }
         });
+    }
+
+    public void refresh() {
+        view.refreshSales(report.getSales());
+        updateBreakdownSummaries(report.getSales());
+        populateBrandFilter();
     }
 
     private void populateBrandFilter() {
@@ -52,24 +60,11 @@ public class MonitoringController {
         view.populateBrandFilter(brands);
     }
 
-    public void refresh() {
-        view.refreshSales(report.getSales());
-        updateBreakdownSummaries(report.getSales());
-        populateBrandFilter();
-    }
-
-    // ---------------------------------------------
-    // FILTER LOGIC
-    // ---------------------------------------------
     private void applyFilters() {
         String selectedBrand = Objects.requireNonNull(view.getCbFilterBrand().getSelectedItem()).toString();
 
-        Date dateFrom = parseDateFromSelectors(
-                view.getFromDay(), view.getFromMonth(), view.getFromYear()
-        );
-        Date dateTo = parseDateFromSelectors(
-                view.getToDay(), view.getToMonth(), view.getToYear()
-        );
+        Date dateFrom = parseDateFromSelectors(view.getFromDay(), view.getFromMonth(), view.getFromYear());
+        Date dateTo = parseDateFromSelectors(view.getToDay(), view.getToMonth(), view.getToYear());
 
         if (dateFrom != null && dateTo != null && dateFrom.after(dateTo)) {
             JOptionPane.showMessageDialog(view, "Invalid date range: 'From' cannot be after 'To'.");
@@ -84,11 +79,10 @@ public class MonitoringController {
 
             boolean matchesBrand = true;
             if (!selectedBrand.equals("All Brands")) {
-                matchesBrand = s.getItems().stream()
-                        .anyMatch(it -> {
-                            Product p = inventory.getProduct(it.getProductId());
-                            return p != null && selectedBrand.equalsIgnoreCase(p.getBrand());
-                        });
+                matchesBrand = s.getItems().stream().anyMatch(it -> {
+                    Product p = inventory.getProduct(it.getProductId());
+                    return p != null && selectedBrand.equalsIgnoreCase(p.getBrand());
+                });
             }
 
             if (withinDate && matchesBrand) filtered.add(s);
@@ -96,7 +90,6 @@ public class MonitoringController {
 
         view.refreshSales(filtered);
         updateBreakdownSummaries(filtered);
-
     }
 
     private Date parseDateFromSelectors(String day, String month, String year) {
@@ -106,18 +99,9 @@ public class MonitoringController {
             int d = Integer.parseInt(day);
             int y = Integer.parseInt(year);
             int m = switch (month) {
-                case "Jan" -> 0;
-                case "Feb" -> 1;
-                case "Mar" -> 2;
-                case "Apr" -> 3;
-                case "May" -> 4;
-                case "Jun" -> 5;
-                case "Jul" -> 6;
-                case "Aug" -> 7;
-                case "Sep" -> 8;
-                case "Oct" -> 9;
-                case "Nov" -> 10;
-                case "Dec" -> 11;
+                case "Jan" -> 0; case "Feb" -> 1; case "Mar" -> 2; case "Apr" -> 3;
+                case "May" -> 4; case "Jun" -> 5; case "Jul" -> 6; case "Aug" -> 7;
+                case "Sep" -> 8; case "Oct" -> 9; case "Nov" -> 10; case "Dec" -> 11;
                 default -> 0;
             };
 
@@ -131,30 +115,21 @@ public class MonitoringController {
     }
 
     private void clearFilters() {
-        // Reset brands
-        if (view.getCbFilterBrand().getItemCount() > 0) {
-            view.getCbFilterBrand().setSelectedIndex(0);
-        }
-
-        // Reset "From"
-        if (view.getCbFromDay() != null)   view.getCbFromDay().setSelectedIndex(0);
+        if (view.getCbFilterBrand().getItemCount() > 0) view.getCbFilterBrand().setSelectedIndex(0);
+        if (view.getCbFromDay() != null) view.getCbFromDay().setSelectedIndex(0);
         if (view.getCbFromMonth() != null) view.getCbFromMonth().setSelectedIndex(0);
-        if (view.getCbFromYear() != null)  view.getCbFromYear().setSelectedIndex(0);
-
-        // Reset "To"
-        if (view.getCbToDay() != null)     view.getCbToDay().setSelectedIndex(0);
-        if (view.getCbToMonth() != null)   view.getCbToMonth().setSelectedIndex(0);
-        if (view.getCbToYear() != null)    view.getCbToYear().setSelectedIndex(0);
-
-        // Refresh the table
+        if (view.getCbFromYear() != null) view.getCbFromYear().setSelectedIndex(0);
+        if (view.getCbToDay() != null) view.getCbToDay().setSelectedIndex(0);
+        if (view.getCbToMonth() != null) view.getCbToMonth().setSelectedIndex(0);
+        if (view.getCbToYear() != null) view.getCbToYear().setSelectedIndex(0);
         refresh();
     }
 
     private void updateBreakdownSummaries(Collection<Sale> sales) {
-            brandTotals.clear();
-            typeTotals.clear();
+        brandTotals.clear();
+        typeTotals.clear();
 
-            for (Sale s : sales) {
+        for (Sale s : sales) {
             for (SaleItem it : s.getItems()) {
                 Product p = inventory.getProduct(it.getProductId());
                 if (p != null) {
@@ -181,23 +156,11 @@ public class MonitoringController {
 
         view.updateBreakdown(brandText.toString(), typeText.toString());
 
-        // Which chart
         String mode = (String) view.getCbChartMode().getSelectedItem();
         if ("Type Revenue".equals(mode)) {
             view.getBarChartPanel().setData(typeTotals);
         } else {
             view.getBarChartPanel().setData(brandTotals);
         }
-
-        // Listener
-        view.getCbChartMode().addActionListener(e -> {
-            String selected = (String) view.getCbChartMode().getSelectedItem();
-            if ("Type Revenue".equals(selected)) {
-                view.getBarChartPanel().setData(typeTotals);
-            } else {
-                view.getBarChartPanel().setData(brandTotals);
-            }
-        });
     }
-
 }

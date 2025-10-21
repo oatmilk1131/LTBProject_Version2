@@ -9,6 +9,8 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Objects;
 
+
+    //InventoryController, handles all inventory management logic: add, update, delete, and table refresh.
 public class InventoryController {
     private final Inventory inventory;
     private final InventoryPanel view;
@@ -23,6 +25,7 @@ public class InventoryController {
     private void attachListeners() {
         view.getBtnAddUpdate().addActionListener(e -> addOrUpdate());
         view.getBtnDelete().addActionListener(e -> delete());
+
         view.getTable().addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -46,6 +49,7 @@ public class InventoryController {
 
         double price;
         int qty;
+
         try {
             price = Double.parseDouble(view.getTfPrice().getText().trim());
             qty = Integer.parseInt(view.getTfQty().getText().trim());
@@ -94,5 +98,7 @@ public class InventoryController {
         view.refreshInventory(inventory.getAll());
     }
 
-    public InventoryPanel getView() { return view; }
+    public InventoryPanel getView() {
+        return view;
+    }
 }
