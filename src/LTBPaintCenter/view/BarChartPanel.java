@@ -37,7 +37,7 @@ public class BarChartPanel extends JPanel {
 
         int width = getWidth();
         int barHeight = 25;
-        int x = 100; // label spacing
+        int x = 100;
         int y = 40;
         int labelWidth = 80;
 

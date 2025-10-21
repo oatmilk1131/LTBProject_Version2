@@ -13,22 +13,15 @@ public class SaleItem {
         this.qty = qty;
     }
 
-    // ----------------------
-    // Add quantity safely
-    // ----------------------
     public void addQuantity(int additional) {
         this.qty += additional;
     }
 
-    // ----------------------
-    // Getters
-    // ----------------------
     public double getSubtotal() { return price * qty; }
     public String getProductId() { return productId; }
     public String getName() { return name; }
     public int getQty() { return qty; }
     public double getPrice() { return price; }
 
-    // Optional: setter if you want to allow name/price edits
     public void setQty(int qty) { this.qty = qty; }
 }

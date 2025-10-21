@@ -18,15 +18,4 @@ public class Inventory {
             p.setQuantity(newQty);
         }
     }
-
-    // Phase 2 addition: get total sold per product
-    public Map<String, Integer> getTotalSold(Map<String,Integer> cumulativeSales) {
-        Map<String, Integer> result = new LinkedHashMap<>();
-        for (var entry : map.entrySet()) {
-            String id = entry.getKey();
-            int sold = cumulativeSales.getOrDefault(id, 0);
-            result.put(id, sold);
-        }
-        return result;
-    }
 }

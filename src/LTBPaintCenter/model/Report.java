@@ -13,11 +13,5 @@ public class Report {
                     cumulativeProductSales.getOrDefault(it.getProductId(),0) + it.getQty());
         }
     }
-
     public List<Sale> getSales() { return Collections.unmodifiableList(sales); }
-    public int getTotalSalesCount() { return sales.size(); }
-    public double getTotalRevenue() { return sales.stream().mapToDouble(Sale::getTotal).sum(); }
-
-    // Phase 2 addition: total items sold per product
-    public Map<String,Integer> getCumulativeProductSales() { return Collections.unmodifiableMap(cumulativeProductSales); }
 }

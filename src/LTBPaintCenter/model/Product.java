@@ -20,11 +20,7 @@ public class Product {
         this.type = type;
     }
 
-    // Existing simple constructor for compatibility
-    public Product(String id, String name, double price, int quantity) {
-        this(id, name, price, quantity, "", "", "");
-    }
-
+    // Getters
     public String getId() { return id; }
     public String getName() { return name; }
     public double getPrice() { return price; }
@@ -33,6 +29,7 @@ public class Product {
     public String getColor() { return color; }
     public String getType() { return type; }
 
+    //Setters
     public void setQuantity(int q) { this.quantity = q; }
     public void setPrice(double p) { this.price = p; }
     public void setName(String n) { this.name = n; }
