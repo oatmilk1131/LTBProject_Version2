@@ -126,7 +126,7 @@ public class POSPanel extends JPanel {
         rightPanel.setBackground(Color.WHITE);
 
         JLabel lblCart = new JLabel("🛒 Cart");
-        lblCart.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lblCart.setFont(new Font("Segoe UI Emoji", Font.BOLD, 14));
 
         JPanel top = new JPanel(new BorderLayout());
         top.setBackground(Color.WHITE);
@@ -301,7 +301,7 @@ public class POSPanel extends JPanel {
             imgLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 36));
         }
         card.add(imgLabel, BorderLayout.CENTER);
-        
+
         JLabel lblName = new JLabel("<html><center>" + p.getName() + "</center></html>", SwingConstants.CENTER);
         lblName.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         JLabel lblPrice = new JLabel(String.format("₱%.2f", p.getPrice()), SwingConstants.CENTER);

@@ -65,7 +65,7 @@ public class MainFrame extends JFrame {
         topPanel.setBackground(new Color(230, 230, 230));
         topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        lblProfile.setFont(new Font("Segoe UI", Font.PLAIN, 36));
+        lblProfile.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 36));
         lblProfile.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         lblProfile.setToolTipText("Switch to Admin (Password Protected)");
         lblProfile.addMouseListener(new java.awt.event.MouseAdapter() {
