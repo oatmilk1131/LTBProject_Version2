@@ -250,32 +250,74 @@ public class POSPanel extends JPanel {
     }
 
     // Product card & quantity dialog
+    private ImageIcon loadIconResource(String resourcePath, int w, int h) {
+        try {
+            // Try resource as stream (works inside IDE and inside jar)
+            var is = getClass().getResourceAsStream(resourcePath);
+            if (is != null) {
+                var img = javax.imageio.ImageIO.read(is);
+                if (img != null) {
+                    var scaled = img.getScaledInstance(w, h, Image.SCALE_SMOOTH);
+                    return new ImageIcon(scaled);
+                }
+            } else {
+                // debug: resource not found
+                // javax.swing.JOptionPane.showMessageDialog(this, "Resource not found: " + resourcePath);
+            }
+        } catch (Exception ex) {
+            // ignore and fallback
+        }
+        return null;
+    }
+
     private JPanel createProductCard(Product p) {
         JPanel card = new JPanel(new BorderLayout());
         card.setPreferredSize(new Dimension(150, 150));
         card.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200)));
         card.setBackground(Color.WHITE);
 
-        JLabel icon = new JLabel("🖌️", SwingConstants.CENTER);
-        icon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 36));
-        card.add(icon, BorderLayout.CENTER);
+        // Filename image
+        String imageName = switch (p.getId()) {
+            case "P001" -> "boysen_red.png";
+            case "P002" -> "boysen_white.png";
+            case "P003" -> "boysen_green.png";
+            case "P004" -> "davies_blue.png";
+            case "P005" -> "davies_yellow.png";
+            case "P006" -> "nation_black.png";
+            case "P007" -> "nation_gray.png";
+            default -> null;
+        };
 
+        ImageIcon icon = null;
+        if (imageName != null) {
+            icon = loadIconResource("/LTBPaintCenter/assets/" + imageName, 100, 100);
+        }
+
+        JLabel imgLabel;
+        if (icon != null) {
+            imgLabel = new JLabel(icon, SwingConstants.CENTER);
+        } else {
+            imgLabel = new JLabel("🖌️", SwingConstants.CENTER);
+            imgLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 36));
+        }
+        card.add(imgLabel, BorderLayout.CENTER);
+        
         JLabel lblName = new JLabel("<html><center>" + p.getName() + "</center></html>", SwingConstants.CENTER);
         lblName.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         JLabel lblPrice = new JLabel(String.format("₱%.2f", p.getPrice()), SwingConstants.CENTER);
         lblPrice.setFont(new Font("Segoe UI", Font.BOLD, 12));
 
-        JPanel bottom = new JPanel(new GridLayout(2,1));
+        JPanel bottom = new JPanel(new GridLayout(2, 1));
         bottom.setBackground(Color.WHITE);
         bottom.add(lblName);
         bottom.add(lblPrice);
         card.add(bottom, BorderLayout.SOUTH);
 
         card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        card.addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent e) { openQuantityDialogAndAdd(p); }
-            @Override public void mouseEntered(MouseEvent e) { card.setBackground(new Color(245, 245, 245)); }
-            @Override public void mouseExited(MouseEvent e) { card.setBackground(Color.WHITE); }
+        card.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent e) { openQuantityDialogAndAdd(p); }
+            @Override public void mouseEntered(java.awt.event.MouseEvent e) { card.setBackground(new Color(245, 245, 245)); }
+            @Override public void mouseExited(java.awt.event.MouseEvent e) { card.setBackground(Color.WHITE); }
         });
 
         return card;
