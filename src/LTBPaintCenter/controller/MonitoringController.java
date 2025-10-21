@@ -8,8 +8,8 @@ import LTBPaintCenter.view.MonitoringPanel;
 import java.text.SimpleDateFormat;
 
 public class MonitoringController {
-    private Report report;
-    private MonitoringPanel view;
+    private final Report report;
+    private final MonitoringPanel view;
 
     public MonitoringController(Report report) {
         this.report = report;
@@ -25,8 +25,8 @@ public class MonitoringController {
             for (SaleItem it : s.getItems()) {
                 items.append(it.getName()).append(" x").append(it.getQty()).append(", ");
             }
-            if (items.length() > 2) items.setLength(items.length()-2);
-            view.addRow(new Object[]{s.getId(), fmt.format(s.getDate()), items.toString(), String.format("%.2f", s.getTotal())});
+            if (items.length() > 2) items.setLength(items.length() - 2);
+            view.addRow(new Object[]{s.getId(), fmt.format(s.getDate()), items.toString(), String.format("₱%.2f", s.getTotal())});
         }
         view.updateSummary(report.getTotalSalesCount(), report.getTotalRevenue());
     }

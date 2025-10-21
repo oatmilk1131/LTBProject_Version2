@@ -32,7 +32,8 @@ public class MainController {
         monitoringController = new MonitoringController(report);
 
         // Frame
-        frame = new MainFrame();
+        frame = new MainFrame(posController, inventoryController, monitoringController);
+        frame.setVisible(true);
 
         // Add panels
         frame.addPanel(posController.getView(), "POS");

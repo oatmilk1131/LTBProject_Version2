@@ -9,30 +9,28 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
 public class InventoryController {
-    private Inventory inventory;
-    private InventoryPanel view;
+    private final Inventory inventory;
+    private final InventoryPanel view;
 
     public InventoryController(Inventory inventory) {
         this.inventory = inventory;
         this.view = new InventoryPanel();
-
         attachListeners();
         refreshInventory();
     }
 
     private void attachListeners() {
-        view.getBtnAddOrUpdate().addActionListener(e -> addOrUpdate());
+        view.getBtnAddUpdate().addActionListener(e -> addOrUpdate());
         view.getBtnDelete().addActionListener(e -> delete());
-
         view.getTable().addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 int r = view.getTable().getSelectedRow();
                 if (r >= 0) {
-                    view.getTfId().setText(view.getTable().getValueAt(r,0).toString());
-                    view.getTfName().setText(view.getTable().getValueAt(r,1).toString());
-                    view.getTfPrice().setText(view.getTable().getValueAt(r,2).toString());
-                    view.getTfQty().setText(view.getTable().getValueAt(r,3).toString());
+                    view.getTfId().setText(view.getTable().getValueAt(r, 0).toString());
+                    view.getTfName().setText(view.getTable().getValueAt(r, 1).toString());
+                    view.getTfPrice().setText(view.getTable().getValueAt(r, 2).toString());
+                    view.getTfQty().setText(view.getTable().getValueAt(r, 3).toString());
                 }
             }
         });
@@ -41,36 +39,48 @@ public class InventoryController {
     private void addOrUpdate() {
         String id = view.getTfId().getText().trim();
         String name = view.getTfName().getText().trim();
-        double price; int qty;
-
-        try {
-            price = Double.parseDouble(view.getTfPrice().getText().trim());
-            qty = Integer.parseInt(view.getTfQty().getText().trim());
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(view,"Invalid price/quantity");
+        if (id.isEmpty() || name.isEmpty()) {
+            JOptionPane.showMessageDialog(view, "Please fill in ID and Name");
             return;
         }
 
-        Product p = inventory.getProduct(id);
-        if (p == null) {
-            inventory.addProduct(new Product(id, name, price, qty));
-        } else {
-            p.setName(name);
-            p.setPrice(price);
-            p.setQuantity(qty);
-        }
+        try {
+            double price = Double.parseDouble(view.getTfPrice().getText().trim());
+            int qty = Integer.parseInt(view.getTfQty().getText().trim());
+            Product existing = inventory.getProduct(id);
 
-        refreshInventory();
+            if (existing == null) {
+                inventory.addProduct(new Product(id, name, price, qty));
+            } else {
+                existing.setName(name);
+                existing.setPrice(price);
+                existing.setQuantity(qty);
+            }
+            refreshInventory();
+            JOptionPane.showMessageDialog(view, "Product saved!");
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(view, "Invalid price or quantity");
+        }
     }
 
     private void delete() {
         String id = view.getTfId().getText().trim();
         if (id.isEmpty()) {
-            JOptionPane.showMessageDialog(view,"Select a product first");
+            JOptionPane.showMessageDialog(view, "Select a product first");
             return;
         }
-        inventory.removeProduct(id);
-        refreshInventory();
+
+        if (inventory.getProduct(id) == null) {
+            JOptionPane.showMessageDialog(view, "Product not found");
+            return;
+        }
+
+        int confirm = JOptionPane.showConfirmDialog(view, "Delete this product?", "Confirm", JOptionPane.YES_NO_OPTION);
+        if (confirm == JOptionPane.YES_OPTION) {
+            inventory.removeProduct(id);
+            refreshInventory();
+            JOptionPane.showMessageDialog(view, "Deleted.");
+        }
     }
 
     public void refreshInventory() {
