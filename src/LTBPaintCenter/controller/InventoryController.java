@@ -30,8 +30,8 @@ public class InventoryController {
                 if (r >= 0) {
                     view.getTfId().setText(view.getTable().getValueAt(r, 0).toString());
                     view.getTfName().setText(view.getTable().getValueAt(r, 1).toString());
-                    view.getTfPrice().setText(view.getTable().getValueAt(r, 2).toString());
-                    view.getTfQty().setText(view.getTable().getValueAt(r, 3).toString());
+                    view.getTfPrice().setText(view.getTable().getValueAt(r, 5).toString());
+                    view.getTfQty().setText(view.getTable().getValueAt(r, 6).toString());
                 }
             }
         });

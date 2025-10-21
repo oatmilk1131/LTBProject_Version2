@@ -149,6 +149,33 @@ public class InventoryPanel extends JPanel {
         });
 
         JScrollPane scroll = new JScrollPane(table);
+        // Single-click row to load data into form (auto combo selection)
+        table.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                int row = table.getSelectedRow();
+                if (row >= 0) {
+                    // Convert to model index if table sorting is enabled
+                    int modelRow = table.convertRowIndexToModel(row);
+
+                    // Load basic info
+                    tfId.setText(model.getValueAt(modelRow, 0).toString());
+                    tfName.setText(model.getValueAt(modelRow, 1).toString());
+                    tfPrice.setText(model.getValueAt(modelRow, 5).toString());
+                    tfQty.setText(model.getValueAt(modelRow, 6).toString());
+
+                    // Auto-select combo boxes safely
+                    String brandVal = model.getValueAt(modelRow, 2).toString();
+                    String colorVal = model.getValueAt(modelRow, 3).toString();
+                    String typeVal  = model.getValueAt(modelRow, 4).toString();
+
+                    selectComboBoxValue(cbBrand, brandVal);
+                    selectComboBoxValue(cbColor, colorVal);
+                    selectComboBoxValue(cbType, typeVal);
+                }
+            }
+        });
+
         midPanel.add(scroll, BorderLayout.CENTER);
 
         add(midPanel, BorderLayout.CENTER);
@@ -212,6 +239,17 @@ public class InventoryPanel extends JPanel {
 
         // Clear table selection
         table.clearSelection();
+    }
+
+    private void selectComboBoxValue(JComboBox<String> comboBox, String value) {
+        if (value == null || value.isBlank()) return;
+        for (int i = 0; i < comboBox.getItemCount(); i++) {
+            String item = comboBox.getItemAt(i);
+            if (item.equalsIgnoreCase(value)) {
+                comboBox.setSelectedIndex(i);
+                return;
+            }
+        }
     }
 
     // Getters for controller
