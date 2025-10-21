@@ -15,7 +15,7 @@ public class POSPanel extends JPanel {
 
     private ActionListener checkoutListener;
     private ActionListener clearCartListener;
-    private ProductClickListener addToCartListener;
+    //private ProductClickListener addToCartListener;
 
     public POSPanel(){
         setLayout(new BorderLayout(8,8));
@@ -37,7 +37,7 @@ public class POSPanel extends JPanel {
             JButton btn = new JButton("<html>"+p.getName()+"<br>₱"+String.format("%.2f",p.getPrice())+"</html>");
             btn.setPreferredSize(new Dimension(120,120));
             btn.addActionListener(e -> {
-                if(addToCartListener != null) addToCartListener.onClick(p);
+                //if(addToCartListener != null) addToCartListener.onClick(p);
             });
             productGrid.add(btn);
         }
@@ -50,14 +50,36 @@ public class POSPanel extends JPanel {
         lblSubtotal.setText("Total: ₱"+String.format("%.2f",total));
     }
 
+    public void refreshPOS(Collection<Product> products) {
+        productGrid.removeAll(); // clear previous items
+
+        for (Product p : products) {
+            JButton productBtn = new JButton("<html>" + p.getName() + "<br>₱" + p.getPrice() + "</html>");
+            productBtn.setPreferredSize(new Dimension(120, 120));
+            productBtn.addActionListener(e -> {
+                if (addToCartListener != null) addToCartListener.accept(p);
+            });
+            productGrid.add(productBtn);
+        }
+
+        productGrid.revalidate();
+        productGrid.repaint();
+    }
+
     // Listener setters
     public void setCheckoutListener(ActionListener l){ checkoutListener = l; }
     public void setClearCartListener(ActionListener l){ clearCartListener = l; }
-    public void setAddToCartListener(ProductClickListener l){ addToCartListener = l; }
+    //public void setAddToCartListener(ProductClickListener l){ addToCartListener = l; }
 
     // Custom functional interface for product clicks
-    @FunctionalInterface
+    /*@FunctionalInterface
     public interface ProductClickListener{
         void onClick(Product product);
+    }*/
+
+    private java.util.function.Consumer<Product> addToCartListener;
+    public void setAddToCartListener(java.util.function.Consumer<Product> listener) {
+        this.addToCartListener = listener;
     }
+
 }

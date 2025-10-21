@@ -36,8 +36,9 @@ public class POSController {
 
     // Called when switching to POS panel
     public void refreshPOS() {
-        view.refreshProducts(inventory.getAll(), cart);
-        view.updateSubtotal(cart);
+        view.refreshPOS(inventory.getAll());
+        /*view.refreshProducts(inventory.getAll(), cart);
+        view.updateSubtotal(cart);*/
     }
 
     void promptAddToCart(Product selected) {
