@@ -2,20 +2,21 @@ package LTBPaintCenter.view;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.ActionEvent;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MainFrame extends JFrame {
-    private JPanel mainPanel;
-    private JPanel sidebarPanel;
-    private JButton btnPOS, btnInventory, btnMonitoring;
-    private JLabel profileIcon;
-    private boolean isAdmin = false;
-    private CardLayout cardLayout;
+    private final JPanel mainPanel = new JPanel();
+    private final CardLayout cardLayout = new CardLayout();
+    private final JPanel sidebar = new JPanel(new GridLayout(6, 1, 10, 10));
+    private final JButton btnPOS = new JButton("POS");
+    private final JButton btnInventory = new JButton("Inventory");
+    private final JButton btnMonitoring = new JButton("Monitoring");
+    private final JLabel profileIcon = new JLabel("👤", SwingConstants.CENTER);
 
-    private POSPanel posPanel;
-    private InventoryPanel inventoryPanel;
-    private MonitoringPanel monitoringPanel;
+    private boolean isAdmin = false;
+    private final Map<String, JPanel> panelMap = new HashMap<>();
 
     public MainFrame() {
         setTitle("Product Management System for LTB Paint Center");
@@ -23,53 +24,36 @@ public class MainFrame extends JFrame {
         setSize(1200, 720);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
+        getContentPane().setBackground(Color.WHITE);
 
-        // Sidebar
-        sidebarPanel = new JPanel(new GridLayout(6,1,10,10));
-        sidebarPanel.setBackground(new Color(40,44,52));
-        sidebarPanel.setPreferredSize(new Dimension(180,getHeight()));
+        // Sidebar styling
+        sidebar.setBackground(new Color(240, 240, 240));
+        sidebar.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        btnPOS = new JButton("POS");
-        btnInventory = new JButton("Inventory");
-        btnMonitoring = new JButton("Monitoring");
+        styleSidebarButton(btnPOS);
+        styleSidebarButton(btnInventory);
+        styleSidebarButton(btnMonitoring);
 
-        styleButton(btnPOS);
-        styleButton(btnInventory);
-        styleButton(btnMonitoring);
-
-        // Profile icon
-        profileIcon = new JLabel();
-        profileIcon.setHorizontalAlignment(SwingConstants.CENTER);
-        profileIcon.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        profileIcon.setFont(new Font("Segoe UI", Font.PLAIN, 32));
+        profileIcon.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         profileIcon.setToolTipText("Switch to Admin (Password Protected)");
-
-        profileIcon.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
+        profileIcon.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent e) {
                 handleAdminToggle();
             }
         });
 
-        sidebarPanel.add(profileIcon);
-        sidebarPanel.add(btnPOS);
-        sidebarPanel.add(btnInventory);
-        sidebarPanel.add(btnMonitoring);
-        sidebarPanel.add(new JLabel()); // spacing
-        add(sidebarPanel, BorderLayout.WEST);
+        sidebar.add(profileIcon);
+        sidebar.add(btnPOS);
+        sidebar.add(btnInventory);
+        sidebar.add(btnMonitoring);
+        sidebar.add(new JLabel());
+        sidebar.add(new JLabel()); // spacing
 
-        // Main panel
-        mainPanel = new JPanel();
-        cardLayout = new CardLayout();
+        add(sidebar, BorderLayout.WEST);
+
+        // Main panel (CardLayout)
         mainPanel.setLayout(cardLayout);
-
-        posPanel = new POSPanel();
-        inventoryPanel = new InventoryPanel();
-        monitoringPanel = new MonitoringPanel();
-
-        mainPanel.add(posPanel,"POS");
-        mainPanel.add(inventoryPanel,"Inventory");
-        mainPanel.add(monitoringPanel,"Monitoring");
-
         add(mainPanel, BorderLayout.CENTER);
 
         // Sidebar actions
@@ -80,52 +64,92 @@ public class MainFrame extends JFrame {
         updateAccess();
     }
 
-    private void styleButton(JButton btn) {
-        btn.setBackground(new Color(70,73,83));
-        btn.setForeground(Color.WHITE);
-        btn.setFocusPainted(false);
-        btn.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        btn.setBorderPainted(false);
+    // -------------------------------
+    // Public API
+    // -------------------------------
+
+    public void addPanel(JPanel panel, String name) {
+        panelMap.put(name, panel);
+        mainPanel.add(panel, name);
     }
 
-    private void handleAdminToggle() {
-        if(!isAdmin) {
-            JPasswordField pf = new JPasswordField();
-            int option = JOptionPane.showConfirmDialog(this, pf, "Enter Admin Password", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-            if(option == JOptionPane.OK_OPTION){
-                String pw = new String(pf.getPassword());
-                if(pw.equals("admin123")){
-                    isAdmin = true;
-                    JOptionPane.showMessageDialog(this,"Admin mode activated!");
-                } else JOptionPane.showMessageDialog(this,"Incorrect password.","Access Denied",JOptionPane.ERROR_MESSAGE);
-            }
-        } else {
-            int confirm = JOptionPane.showConfirmDialog(this,"Switch back to Cashier mode?","Confirm",JOptionPane.YES_NO_OPTION);
-            if(confirm == JOptionPane.YES_OPTION){
-                isAdmin = false;
-                JOptionPane.showMessageDialog(this,"Returned to Cashier mode.");
-            }
+    /** Switch panel and refresh depending on type */
+    public void showPanel(String name) {
+        JPanel panel = panelMap.get(name);
+        if (panel == null) return;
+
+        if (name.equals("POS") && panel instanceof POSPanel p) {
+            // Ask panel to refresh products if method exists
+            p.refreshProducts(LTBPaintCenter.model.Global.inventory.getAll());
         }
-        updateAccess();
+        if (name.equals("Inventory") && panel instanceof InventoryPanel inv) {
+            inv.refreshInventory(LTBPaintCenter.model.Global.inventory.getAll());
+        }
+        if (name.equals("Monitoring") && panel instanceof MonitoringPanel mon) {
+            mon.repaint();
+        }
+
+        cardLayout.show(mainPanel, name);
     }
 
-    private void updateAccess(){
-        btnInventory.setEnabled(isAdmin);
-        btnInventory.setToolTipText(isAdmin?"Inventory Management":"Admin access required");
+    public boolean isAdmin() {
+        return isAdmin;
+    }
 
-        if(isAdmin)
+    public void updateAccess() {
+        btnInventory.setEnabled(isAdmin);
+        btnMonitoring.setEnabled(isAdmin);
+
+        btnInventory.setToolTipText(isAdmin ? "Inventory Management" : "Admin access required");
+        btnMonitoring.setToolTipText(isAdmin ? "Sales Monitoring" : "Admin access required");
+
+        if (isAdmin)
             profileIcon.setToolTipText("Currently in Admin Mode (Click to switch)");
         else
             profileIcon.setToolTipText("Switch to Admin (Password Protected)");
     }
 
-    public void showPanel(String name){
-        cardLayout.show(mainPanel,name);
+    // -------------------------------
+    // Private logic
+    // -------------------------------
+
+    private void styleSidebarButton(JButton b) {
+        b.setFocusPainted(false);
+        b.setBackground(new Color(220, 220, 220));
+        b.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        b.setHorizontalAlignment(SwingConstants.LEFT);
+        b.setMargin(new Insets(8, 16, 8, 16));
+
+        b.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseEntered(java.awt.event.MouseEvent e) {
+                b.setBackground(new Color(200, 200, 200));
+            }
+            @Override public void mouseExited(java.awt.event.MouseEvent e) {
+                b.setBackground(new Color(220, 220, 220));
+            }
+        });
     }
 
-    // Getters for controllers
-    public boolean isAdmin(){ return isAdmin; }
-    public POSPanel getPOSPanel(){ return posPanel; }
-    public InventoryPanel getInventoryPanel(){ return inventoryPanel; }
-    public MonitoringPanel getMonitoringPanel(){ return monitoringPanel; }
+    private void handleAdminToggle() {
+        if (!isAdmin) {
+            JPasswordField pf = new JPasswordField();
+            int option = JOptionPane.showConfirmDialog(this, pf, "Enter Admin Password:", JOptionPane.OK_CANCEL_OPTION);
+            if (option == JOptionPane.OK_OPTION) {
+                String pass = new String(pf.getPassword());
+                if (pass.equals("admin123")) {
+                    isAdmin = true;
+                    JOptionPane.showMessageDialog(this, "Admin mode activated!");
+                } else {
+                    JOptionPane.showMessageDialog(this, "Incorrect password.", "Access Denied", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        } else {
+            int confirm = JOptionPane.showConfirmDialog(this, "Switch back to Cashier mode?", "Confirm", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                isAdmin = false;
+                JOptionPane.showMessageDialog(this, "Returned to Cashier mode.");
+            }
+        }
+        updateAccess();
+    }
 }

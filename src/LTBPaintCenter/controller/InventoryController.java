@@ -4,63 +4,78 @@ import LTBPaintCenter.model.Inventory;
 import LTBPaintCenter.model.Product;
 import LTBPaintCenter.view.InventoryPanel;
 
-import java.util.Collection;
+import javax.swing.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 public class InventoryController {
     private Inventory inventory;
     private InventoryPanel view;
 
-    public InventoryController(Inventory inv){
-        inventory = inv;
-        view = new InventoryPanel();
+    public InventoryController(Inventory inventory) {
+        this.inventory = inventory;
+        this.view = new InventoryPanel();
+
         attachListeners();
         refreshInventory();
     }
 
-    public InventoryPanel getView(){ return view; }
+    private void attachListeners() {
+        view.getBtnAddOrUpdate().addActionListener(e -> addOrUpdate());
+        view.getBtnDelete().addActionListener(e -> delete());
 
-    private void attachListeners(){
-        view.setAddOrUpdateListener(this::addOrUpdate);
-        view.setDeleteListener(this::delete);
+        view.getTable().addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int r = view.getTable().getSelectedRow();
+                if (r >= 0) {
+                    view.getTfId().setText(view.getTable().getValueAt(r,0).toString());
+                    view.getTfName().setText(view.getTable().getValueAt(r,1).toString());
+                    view.getTfPrice().setText(view.getTable().getValueAt(r,2).toString());
+                    view.getTfQty().setText(view.getTable().getValueAt(r,3).toString());
+                }
+            }
+        });
     }
 
-    public void refreshInventory(){
-        Collection<Product> allProducts = inventory.getAll();
-        view.refreshInventory(allProducts);
-    }
+    private void addOrUpdate() {
+        String id = view.getTfId().getText().trim();
+        String name = view.getTfName().getText().trim();
+        double price; int qty;
 
-    private void addOrUpdate(){
-        String id = view.getIdField().getText().trim();
-        String name = view.getNameField().getText().trim();
-        double price;
-        int qty;
-        try{
-            price = Double.parseDouble(view.getPriceField().getText().trim());
-            qty = Integer.parseInt(view.getQtyField().getText().trim());
-        } catch(Exception e){
-            javax.swing.JOptionPane.showMessageDialog(view,"Invalid price or quantity");
+        try {
+            price = Double.parseDouble(view.getTfPrice().getText().trim());
+            qty = Integer.parseInt(view.getTfQty().getText().trim());
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(view,"Invalid price/quantity");
             return;
         }
 
-        Product existing = inventory.getProduct(id);
-        if(existing != null){
-            existing.setName(name);
-            existing.setPrice(price);
-            existing.setQuantity(qty);
+        Product p = inventory.getProduct(id);
+        if (p == null) {
+            inventory.addProduct(new Product(id, name, price, qty));
         } else {
-            inventory.addProduct(new Product(id,name,price,qty));
+            p.setName(name);
+            p.setPrice(price);
+            p.setQuantity(qty);
         }
 
         refreshInventory();
     }
 
-    private void delete(){
-        String id = view.getIdField().getText().trim();
-        if(id.isEmpty()){
-            javax.swing.JOptionPane.showMessageDialog(view,"Select a product first");
+    private void delete() {
+        String id = view.getTfId().getText().trim();
+        if (id.isEmpty()) {
+            JOptionPane.showMessageDialog(view,"Select a product first");
             return;
         }
         inventory.removeProduct(id);
         refreshInventory();
     }
+
+    public void refreshInventory() {
+        view.refreshInventory(inventory.getAll());
+    }
+
+    public InventoryPanel getView() { return view; }
 }

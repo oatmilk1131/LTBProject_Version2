@@ -1,10 +1,13 @@
 package LTBPaintCenter.controller;
 
+import LTBPaintCenter.model.Global;
 import LTBPaintCenter.model.Inventory;
-import LTBPaintCenter.model.Product;
 import LTBPaintCenter.model.Report;
-import LTBPaintCenter.view.InventoryPanel;
+import LTBPaintCenter.model.SaleItem;
 import LTBPaintCenter.view.MainFrame;
+
+import javax.swing.*;
+import java.util.List;
 
 public class MainController {
     private Inventory inventory;
@@ -18,6 +21,9 @@ public class MainController {
     public MainController() {
         inventory = new Inventory();
         report = new Report();
+        Global.inventory = inventory;
+        Global.report = report;
+
         seedData();
 
         // Controllers
@@ -25,27 +31,48 @@ public class MainController {
         inventoryController = new InventoryController(inventory);
         monitoringController = new MonitoringController(report);
 
-        // Main frame
+        // Frame
         frame = new MainFrame();
-        frame.getPOSPanel().setAddToCartListener(posController::promptAddToCart);
-        frame.getPOSPanel().setCheckoutListener(e -> posController.checkout());
-        frame.getPOSPanel().setClearCartListener(e -> posController.clearCart());
 
-        // Inject inventoryController so POS can refresh if needed
-        posController.refreshPOS();
+        // Add panels
+        frame.addPanel(posController.getView(), "POS");
+        frame.addPanel(inventoryController.getView(), "Inventory");
+        frame.addPanel(monitoringController.getView(), "Monitoring");
 
-        // Add panels to frame
-        // Panels are already added inside MainFrame constructor using sidebar
-        // Show default panel
+        // ✅ Connect checkout handler to POS panel
+        posController.getView().setCheckoutHandler(this::handleCheckout);
+
+        // Show default view
         frame.showPanel("POS");
-
-        // Show frame
         frame.setVisible(true);
     }
 
+    private boolean handleCheckout(List<SaleItem> cart) {
+        if (cart == null || cart.isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "Cart is empty");
+            return false;
+        }
+
+        try {
+            String saleId = "S" + (report.getSales().size() + 1);
+            var sale = new LTBPaintCenter.model.Sale(saleId);
+            for (var item : cart) {
+                sale.addItem(item);
+                inventory.updateQuantity(item.getProductId(), -item.getQty());
+            }
+            report.recordSale(sale);
+            monitoringController.refresh();
+            inventoryController.refreshInventory();
+            return true;
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(frame, "Checkout failed: " + e.getMessage());
+            return false;
+        }
+    }
+
     private void seedData() {
-        inventory.addProduct(new Product("P001", "Coke 330ml", 25.0, 50));
-        inventory.addProduct(new Product("P002", "Bread Loaf", 40.0, 20));
-        inventory.addProduct(new Product("P003", "Chips", 30.0, 35));
+        inventory.addProduct(new LTBPaintCenter.model.Product("P001", "Coke 330ml", 25.0, 50));
+        inventory.addProduct(new LTBPaintCenter.model.Product("P002", "Bread Loaf", 40.0, 20));
+        inventory.addProduct(new LTBPaintCenter.model.Product("P003", "Chips", 30.0, 35));
     }
 }
