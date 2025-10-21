@@ -10,7 +10,7 @@ public class InventoryController {
     private Inventory inventory;
     private InventoryPanel view;
 
-    public InventoryController(Inventory inv, InventoryPanel inventoryPanel){
+    public InventoryController(Inventory inv){
         inventory = inv;
         view = new InventoryPanel();
         attachListeners();

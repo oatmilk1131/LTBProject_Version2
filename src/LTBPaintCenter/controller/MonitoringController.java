@@ -9,9 +9,9 @@ public class MonitoringController {
     private Report report;
     private MonitoringPanel view;
 
-    public MonitoringController(Report report, MonitoringPanel panel) {
+    public MonitoringController(Report report) {
         this.report = report;
-        this.view = panel;
+        this.view = new MonitoringPanel();
 
         refreshMonitoring();
     }

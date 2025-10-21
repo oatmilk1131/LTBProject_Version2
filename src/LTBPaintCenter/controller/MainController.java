@@ -1,14 +1,15 @@
 package LTBPaintCenter.controller;
 
-import LTBPaintCenter.model.*;
-import LTBPaintCenter.view.*;
-
-import javax.swing.*;
+import LTBPaintCenter.model.Inventory;
+import LTBPaintCenter.model.Product;
+import LTBPaintCenter.model.Report;
+import LTBPaintCenter.view.InventoryPanel;
+import LTBPaintCenter.view.MainFrame;
 
 public class MainController {
     private Inventory inventory;
     private Report report;
-    private MainFrame mainFrame;
+    private MainFrame frame;
 
     private POSController posController;
     private InventoryController inventoryController;
@@ -19,17 +20,27 @@ public class MainController {
         report = new Report();
         seedData();
 
-        mainFrame = new MainFrame();
+        // Controllers
+        posController = new POSController(inventory, report);
+        inventoryController = new InventoryController(inventory);
+        monitoringController = new MonitoringController(report);
 
-        // controllers
-        posController = new POSController(inventory, report, mainFrame.getPOSPanel());
-        inventoryController = new InventoryController(inventory, mainFrame.getInventoryPanel());
-        monitoringController = new MonitoringController(report, mainFrame.getMonitoringPanel());
+        // Main frame
+        frame = new MainFrame();
+        frame.getPOSPanel().setAddToCartListener(posController::promptAddToCart);
+        frame.getPOSPanel().setCheckoutListener(e -> posController.checkout());
+        frame.getPOSPanel().setClearCartListener(e -> posController.clearCart());
 
-        // initial panel
-        mainFrame.showPanel("POS");
+        // Inject inventoryController so POS can refresh if needed
+        posController.refreshPOS();
 
-        mainFrame.setVisible(true);
+        // Add panels to frame
+        // Panels are already added inside MainFrame constructor using sidebar
+        // Show default panel
+        frame.showPanel("POS");
+
+        // Show frame
+        frame.setVisible(true);
     }
 
     private void seedData() {
