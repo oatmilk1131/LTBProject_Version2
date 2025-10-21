@@ -36,6 +36,9 @@ public class MonitoringPanel extends JPanel {
     private final JTextArea taBrandSummary = new JTextArea();
     private final JTextArea taTypeSummary = new JTextArea();
 
+    private final JComboBox<String> cbChartMode = new JComboBox<>(new String[]{"Brand Revenue", "Type Revenue"});
+    private final BarChartPanel barChartPanel = new BarChartPanel();
+
     public MonitoringPanel() {
         setLayout(new BorderLayout(8, 8));
         setBackground(Color.WHITE);
@@ -146,6 +149,20 @@ public class MonitoringPanel extends JPanel {
         taTypeSummary.setWrapStyleWord(true);
         summaryContainer.add(taTypeSummary);
 
+        summaryContainer.add(Box.createVerticalStrut(10));
+
+        // Chart mode selector
+        JPanel chartHeader = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 4));
+        chartHeader.setBackground(Color.WHITE);
+        chartHeader.add(new JLabel("Chart Mode:"));
+        chartHeader.add(cbChartMode);
+
+        summaryContainer.add(Box.createVerticalStrut(10));
+        summaryContainer.add(chartHeader);
+
+        barChartPanel.setBorder(BorderFactory.createTitledBorder("Visual Breakdown"));
+        summaryContainer.add(barChartPanel);
+
         add(summaryContainer, BorderLayout.SOUTH);
     }
 
@@ -234,4 +251,6 @@ public class MonitoringPanel extends JPanel {
     public JComboBox<String> getCbToDay()   { return cbToDay; }
     public JComboBox<String> getCbToMonth() { return cbToMonth; }
     public JComboBox<String> getCbToYear()  { return cbToYear; }
+    public BarChartPanel getBarChartPanel() { return barChartPanel; }
+    public JComboBox<String> getCbChartMode() { return cbChartMode; }
 }

@@ -13,6 +13,8 @@ public class MonitoringController {
     private final Inventory inventory;
     private final MonitoringPanel view;
     private final SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd");
+    private Map<String, Double> brandTotals = new LinkedHashMap<>();
+    private Map<String, Double> typeTotals = new LinkedHashMap<>();
 
     public MonitoringController(Report report, Inventory inventory) {
         this.report = report;
@@ -28,6 +30,16 @@ public class MonitoringController {
     private void attachListeners() {
         view.getBtnApplyFilter().addActionListener(e -> applyFilters());
         view.getBtnClearFilter().addActionListener(e -> clearFilters());
+
+        // ✅ Add chart mode toggle listener once
+        view.getCbChartMode().addActionListener(e -> {
+            String selected = (String) view.getCbChartMode().getSelectedItem();
+            if ("Type Revenue".equals(selected)) {
+                view.getBarChartPanel().setData(typeTotals);
+            } else {
+                view.getBarChartPanel().setData(brandTotals);
+            }
+        });
     }
 
     private void populateBrandFilter() {
@@ -139,10 +151,10 @@ public class MonitoringController {
     }
 
     private void updateBreakdownSummaries(Collection<Sale> sales) {
-        Map<String, Double> brandTotals = new LinkedHashMap<>();
-        Map<String, Double> typeTotals = new LinkedHashMap<>();
+            brandTotals.clear();
+            typeTotals.clear();
 
-        for (Sale s : sales) {
+            for (Sale s : sales) {
             for (SaleItem it : s.getItems()) {
                 Product p = inventory.getProduct(it.getProductId());
                 if (p != null) {
@@ -168,5 +180,24 @@ public class MonitoringController {
         if (typeText.length() == 0) typeText.append("No data available");
 
         view.updateBreakdown(brandText.toString(), typeText.toString());
+
+        // Which chart
+        String mode = (String) view.getCbChartMode().getSelectedItem();
+        if ("Type Revenue".equals(mode)) {
+            view.getBarChartPanel().setData(typeTotals);
+        } else {
+            view.getBarChartPanel().setData(brandTotals);
+        }
+
+        // Listener
+        view.getCbChartMode().addActionListener(e -> {
+            String selected = (String) view.getCbChartMode().getSelectedItem();
+            if ("Type Revenue".equals(selected)) {
+                view.getBarChartPanel().setData(typeTotals);
+            } else {
+                view.getBarChartPanel().setData(brandTotals);
+            }
+        });
     }
+
 }
