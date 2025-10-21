@@ -42,6 +42,7 @@ public class MonitoringController {
 
     public void refresh() {
         view.refreshSales(report.getSales());
+        updateBreakdownSummaries(report.getSales());
         populateBrandFilter();
     }
 
@@ -82,6 +83,8 @@ public class MonitoringController {
         }
 
         view.refreshSales(filtered);
+        updateBreakdownSummaries(filtered);
+
     }
 
     private Date parseDateFromSelectors(String day, String month, String year) {
@@ -133,5 +136,37 @@ public class MonitoringController {
 
         // Refresh the table
         refresh();
+    }
+
+    private void updateBreakdownSummaries(Collection<Sale> sales) {
+        Map<String, Double> brandTotals = new LinkedHashMap<>();
+        Map<String, Double> typeTotals = new LinkedHashMap<>();
+
+        for (Sale s : sales) {
+            for (SaleItem it : s.getItems()) {
+                Product p = inventory.getProduct(it.getProductId());
+                if (p != null) {
+                    String brand = p.getBrand() == null ? "Unknown" : p.getBrand();
+                    String type = p.getType() == null ? "Unknown" : p.getType();
+
+                    brandTotals.put(brand, brandTotals.getOrDefault(brand, 0.0) + it.getSubtotal());
+                    typeTotals.put(type, typeTotals.getOrDefault(type, 0.0) + it.getSubtotal());
+                }
+            }
+        }
+
+        StringBuilder brandText = new StringBuilder();
+        for (Map.Entry<String, Double> e : brandTotals.entrySet()) {
+            brandText.append(String.format("%s – ₱%.2f%n", e.getKey(), e.getValue()));
+        }
+        if (brandText.length() == 0) brandText.append("No data available");
+
+        StringBuilder typeText = new StringBuilder();
+        for (Map.Entry<String, Double> e : typeTotals.entrySet()) {
+            typeText.append(String.format("%s – ₱%.2f%n", e.getKey(), e.getValue()));
+        }
+        if (typeText.length() == 0) typeText.append("No data available");
+
+        view.updateBreakdown(brandText.toString(), typeText.toString());
     }
 }

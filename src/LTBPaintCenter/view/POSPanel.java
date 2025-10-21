@@ -382,7 +382,7 @@ public class POSPanel extends JPanel {
         public QuantityDialog(String name, int max) {
             setModal(true);
             setTitle("Select Quantity");
-            setSize(300, 160);
+            setSize(300, 180);
             setLocationRelativeTo(null);
             setLayout(new BorderLayout(8, 8));
             setDefaultCloseOperation(DISPOSE_ON_CLOSE);

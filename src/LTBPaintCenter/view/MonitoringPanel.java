@@ -33,6 +33,8 @@ public class MonitoringPanel extends JPanel {
     private final JButton btnApplyFilter = new JButton("Apply");
     private final JButton btnClearFilter = new JButton("Clear");
 
+    private final JTextArea taBrandSummary = new JTextArea();
+    private final JTextArea taTypeSummary = new JTextArea();
 
     public MonitoringPanel() {
         setLayout(new BorderLayout(8, 8));
@@ -112,16 +114,41 @@ public class MonitoringPanel extends JPanel {
     // SUMMARY BAR
     // ------------------------------------------
     private void initSummaryBar() {
-        JPanel summaryPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 20, 8));
-        summaryPanel.setBackground(Color.WHITE);
+        JPanel summaryContainer = new JPanel();
+        summaryContainer.setLayout(new BoxLayout(summaryContainer, BoxLayout.Y_AXIS));
+        summaryContainer.setBackground(Color.WHITE);
+        summaryContainer.setBorder(BorderFactory.createTitledBorder("Sales Summary"));
+
+        // Top summary (totals)
+        JPanel topSummary = new JPanel(new FlowLayout(FlowLayout.RIGHT, 20, 8));
+        topSummary.setBackground(Color.WHITE);
         lblTotalSales.setFont(new Font("Segoe UI", Font.BOLD, 13));
         lblRevenue.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        topSummary.add(lblTotalSales);
+        topSummary.add(lblRevenue);
+        summaryContainer.add(topSummary);
 
-        summaryPanel.add(lblTotalSales);
-        summaryPanel.add(lblRevenue);
+        // Brand summary
+        taBrandSummary.setEditable(false);
+        taBrandSummary.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        taBrandSummary.setBackground(new Color(248, 248, 248));
+        taBrandSummary.setBorder(BorderFactory.createTitledBorder("Revenue by Brand"));
+        taBrandSummary.setLineWrap(true);
+        taBrandSummary.setWrapStyleWord(true);
+        summaryContainer.add(taBrandSummary);
 
-        add(summaryPanel, BorderLayout.SOUTH);
+        // Type summary
+        taTypeSummary.setEditable(false);
+        taTypeSummary.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        taTypeSummary.setBackground(new Color(248, 248, 248));
+        taTypeSummary.setBorder(BorderFactory.createTitledBorder("Revenue by Type"));
+        taTypeSummary.setLineWrap(true);
+        taTypeSummary.setWrapStyleWord(true);
+        summaryContainer.add(taTypeSummary);
+
+        add(summaryContainer, BorderLayout.SOUTH);
     }
+
 
     // ------------------------------------------
     // PUBLIC METHODS
@@ -185,6 +212,11 @@ public class MonitoringPanel extends JPanel {
         cbFilterBrand.removeAllItems();
         cbFilterBrand.addItem("All Brands");
         for (String b : brands) cbFilterBrand.addItem(b);
+    }
+
+    public void updateBreakdown(String brandText, String typeText) {
+        taBrandSummary.setText(brandText);
+        taTypeSummary.setText(typeText);
     }
 
     public JButton getBtnApplyFilter() { return btnApplyFilter; }
