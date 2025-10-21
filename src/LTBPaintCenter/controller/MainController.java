@@ -26,7 +26,7 @@ public class MainController {
         // Controllers
         posController = new POSController(inventory, report);
         inventoryController = new InventoryController(inventory);
-        monitoringController = new MonitoringController(report);
+        monitoringController = new MonitoringController(report, inventory);
 
         // Frame
         frame = new MainFrame(posController, inventoryController, monitoringController);
