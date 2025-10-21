@@ -7,6 +7,7 @@ import LTBPaintCenter.view.InventoryPanel;
 import javax.swing.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.Objects;
 
 public class InventoryController {
     private final Inventory inventory;
@@ -39,28 +40,34 @@ public class InventoryController {
     private void addOrUpdate() {
         String id = view.getTfId().getText().trim();
         String name = view.getTfName().getText().trim();
-        if (id.isEmpty() || name.isEmpty()) {
-            JOptionPane.showMessageDialog(view, "Please fill in ID and Name");
+        String brand = Objects.requireNonNull(view.getCbBrand().getSelectedItem()).toString();
+        String color = Objects.requireNonNull(view.getCbColor().getSelectedItem()).toString();
+        String type = Objects.requireNonNull(view.getCbType().getSelectedItem()).toString();
+
+        double price;
+        int qty;
+        try {
+            price = Double.parseDouble(view.getTfPrice().getText().trim());
+            qty = Integer.parseInt(view.getTfQty().getText().trim());
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(view, "Invalid price/quantity");
             return;
         }
 
-        try {
-            double price = Double.parseDouble(view.getTfPrice().getText().trim());
-            int qty = Integer.parseInt(view.getTfQty().getText().trim());
-            Product existing = inventory.getProduct(id);
-
-            if (existing == null) {
-                inventory.addProduct(new Product(id, name, price, qty));
-            } else {
-                existing.setName(name);
-                existing.setPrice(price);
-                existing.setQuantity(qty);
-            }
-            refreshInventory();
-            JOptionPane.showMessageDialog(view, "Product saved!");
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(view, "Invalid price or quantity");
+        Product existing = inventory.getProduct(id);
+        if (existing == null) {
+            inventory.addProduct(new Product(id, name, price, qty, brand, color, type));
+        } else {
+            existing.setName(name);
+            existing.setPrice(price);
+            existing.setQuantity(qty);
+            existing.setBrand(brand);
+            existing.setColor(color);
+            existing.setType(type);
         }
+
+        refreshInventory();
+        JOptionPane.showMessageDialog(view, "Product saved!");
     }
 
     private void delete() {

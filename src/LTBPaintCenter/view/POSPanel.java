@@ -83,12 +83,48 @@ public class POSPanel extends JPanel {
         add(filterPanel, BorderLayout.NORTH);
     }
 
+    private final JPanel gridContainer = new JPanel(); // wrapper for scroll content
+
     private void initProductArea() {
+        gridContainer.setLayout(new BorderLayout());
+        gridContainer.setBackground(Color.WHITE);
+
+        // productGrid is embedded inside a wrapper panel for proper sizing
         productGrid.setBackground(Color.WHITE);
+        productScroll.setViewportView(productGrid);
         productScroll.setBorder(BorderFactory.createTitledBorder("Available Products"));
-        productScroll.getVerticalScrollBar().setUnitIncrement(12);
-        add(productScroll, BorderLayout.CENTER);
+        productScroll.getVerticalScrollBar().setUnitIncrement(16);
+        productScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+
+        gridContainer.add(productScroll, BorderLayout.CENTER);
+        add(gridContainer, BorderLayout.CENTER);
+
+        // Responsive resizing: recalculates number of columns on window resize
+        productScroll.getViewport().addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent e) {
+                layoutGridToFitWidth();
+            }
+        });
     }
+
+    private void layoutGridToFitWidth() {
+        // Determine width available for cards
+        int availableWidth = productScroll.getViewport().getWidth();
+        int cardWidth = 150 + 12; // 150px card + 12px gap
+        int columns = Math.max(1, availableWidth / cardWidth);
+
+        // 4 is the ideal number of columns
+        if (columns > 4) columns = 4;
+
+        // Update layout dynamically
+        int rows = (int) Math.ceil((double) productMap.size() / columns);
+        GridLayout layout = new GridLayout(rows, columns, 12, 12);
+        productGrid.setLayout(layout);
+        productGrid.revalidate();
+        productGrid.repaint();
+    }
+
 
     private void initCartArea() {
         JPanel rightPanel = new JPanel(new BorderLayout(8, 8));
@@ -203,6 +239,8 @@ public class POSPanel extends JPanel {
 
         // finally update the grid (applies currently selected filter values)
         updateProductGrid(productMap.values());
+        //
+        layoutGridToFitWidth();
     }
 
     // update product grid using filter selections
