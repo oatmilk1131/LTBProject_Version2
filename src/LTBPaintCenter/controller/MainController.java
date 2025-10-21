@@ -6,9 +6,11 @@ import LTBPaintCenter.view.MainFrame;
 import javax.swing.*;
 import java.util.List;
 
+
+    //Main Controller, manages application flow between POS, Inventory and Monitoring
 public class MainController {
-    private Inventory inventory;
-    private Report report;
+    private final Inventory inventory;
+    private final Report report;
     private MainFrame frame;
 
     private POSController posController;
@@ -22,27 +24,25 @@ public class MainController {
         Global.report = report;
 
         seedData();
+        initializeControllers();
+        initializeFrame();
 
-        // Controllers
+        posController.getView().setCheckoutHandler(this::handleCheckout);
+        frame.showPanel("POS");
+        frame.setVisible(true);
+    }
+
+    private void initializeControllers() {
         posController = new POSController(inventory, report);
         inventoryController = new InventoryController(inventory);
-        monitoringController = new MonitoringController(report);
+        monitoringController = new MonitoringController(report, inventory);
+    }
 
-        // Frame
+    private void initializeFrame() {
         frame = new MainFrame(posController, inventoryController, monitoringController);
-        frame.setVisible(true);
-
-        // Add panels
         frame.addPanel(posController.getView(), "POS");
         frame.addPanel(inventoryController.getView(), "Inventory");
         frame.addPanel(monitoringController.getView(), "Monitoring");
-
-        // ✅ Connect checkout handler to POS panel
-        posController.getView().setCheckoutHandler(this::handleCheckout);
-
-        // Show default view
-        frame.showPanel("POS");
-        frame.setVisible(true);
     }
 
     private boolean handleCheckout(List<SaleItem> cart) {
@@ -53,15 +53,18 @@ public class MainController {
 
         try {
             String saleId = "S" + (report.getSales().size() + 1);
-            var sale = new LTBPaintCenter.model.Sale(saleId);
-            for (var item : cart) {
+            Sale sale = new Sale(saleId);
+
+            for (SaleItem item : cart) {
                 sale.addItem(item);
                 inventory.updateQuantity(item.getProductId(), -item.getQty());
             }
+
             report.recordSale(sale);
             monitoringController.refresh();
             inventoryController.refreshInventory();
             return true;
+
         } catch (Exception e) {
             JOptionPane.showMessageDialog(frame, "Checkout failed: " + e.getMessage());
             return false;
@@ -77,5 +80,4 @@ public class MainController {
         inventory.addProduct(new Product("P006", "Nation - Black Primer", 400.0, 18, "Nation", "Black", "Primer"));
         inventory.addProduct(new Product("P007", "Nation - Gray Enamel", 430.0, 22, "Nation", "Gray", "Enamel"));
     }
-
 }

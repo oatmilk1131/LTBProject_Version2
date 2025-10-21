@@ -12,11 +12,9 @@ import java.util.*;
 import java.util.List;
 
 public class POSPanel extends JPanel {
-    // Product area uses FlowLayout to keep cards square and not stretch vertically
     private final JPanel productGrid = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 12));
     private final JScrollPane productScroll = new JScrollPane(productGrid);
 
-    // Cart table
     private final DefaultTableModel cartTableModel = new DefaultTableModel(
             new String[]{"ID", "Name", "Price", "Qty", "Subtotal"}, 0
     ) {
@@ -34,13 +32,13 @@ public class POSPanel extends JPanel {
     private final LinkedHashMap<String, SaleItem> cart = new LinkedHashMap<>();
     private final Map<String, Product> productMap = new LinkedHashMap<>();
 
-    // Filters (ensure these are instance fields and initialized before refresh)
+    // Filters
     private final JComboBox<String> cbBrand = new JComboBox<>();
     private final JComboBox<String> cbColor = new JComboBox<>();
     private final JComboBox<String> cbType = new JComboBox<>();
     private boolean suppressFilterEvents = false;
 
-    // Checkout handler (controller sets)
+    // Checkout handler
     public interface CheckoutHandler { boolean handleCheckout(List<SaleItem> cartSnapshot); }
     private CheckoutHandler checkoutHandler = null;
 
@@ -49,19 +47,17 @@ public class POSPanel extends JPanel {
         setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         setBackground(Color.WHITE);
 
-        initFilterBar();   // create and add filters BEFORE any product refresh
+        initFilterBar();
         initProductArea();
         initCartArea();
 
-        // Wire filter listeners (safe — they check suppressFilterEvents)
+        // Wire filter listeners
         cbBrand.addActionListener(e -> { if (!suppressFilterEvents) updateProductGrid(productMap.values()); });
         cbColor.addActionListener(e -> { if (!suppressFilterEvents) updateProductGrid(productMap.values()); });
         cbType.addActionListener(e -> { if (!suppressFilterEvents) updateProductGrid(productMap.values()); });
     }
 
-    // ---------------------------
-    // Initialization
-    // ---------------------------
+    // Init
     private void initFilterBar() {
         JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
         filterPanel.setBackground(Color.WHITE);
@@ -83,13 +79,12 @@ public class POSPanel extends JPanel {
         add(filterPanel, BorderLayout.NORTH);
     }
 
-    private final JPanel gridContainer = new JPanel(); // wrapper for scroll content
+    private final JPanel gridContainer = new JPanel();
 
     private void initProductArea() {
         gridContainer.setLayout(new BorderLayout());
         gridContainer.setBackground(Color.WHITE);
 
-        // productGrid is embedded inside a wrapper panel for proper sizing
         productGrid.setBackground(Color.WHITE);
         productScroll.setViewportView(productGrid);
         productScroll.setBorder(BorderFactory.createTitledBorder("Available Products"));
@@ -99,7 +94,7 @@ public class POSPanel extends JPanel {
         gridContainer.add(productScroll, BorderLayout.CENTER);
         add(gridContainer, BorderLayout.CENTER);
 
-        // Responsive resizing: recalculates number of columns on window resize
+        // Responsive resizing
         productScroll.getViewport().addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
             public void componentResized(java.awt.event.ComponentEvent e) {
@@ -114,7 +109,6 @@ public class POSPanel extends JPanel {
         int cardWidth = 150 + 12; // 150px card + 12px gap
         int columns = Math.max(1, availableWidth / cardWidth);
 
-        // 4 is the ideal number of columns
         if (columns > 4) columns = 4;
 
         // Update layout dynamically
@@ -132,7 +126,7 @@ public class POSPanel extends JPanel {
         rightPanel.setBackground(Color.WHITE);
 
         JLabel lblCart = new JLabel("🛒 Cart");
-        lblCart.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        lblCart.setFont(new Font("Segoe UI Emoji", Font.BOLD, 14));
 
         JPanel top = new JPanel(new BorderLayout());
         top.setBackground(Color.WHITE);
@@ -186,7 +180,7 @@ public class POSPanel extends JPanel {
             }
         });
 
-        // Double click to edit qty (optional)
+        // Di gumagana
         cartTable.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) editSelectedCartQty();
@@ -194,25 +188,16 @@ public class POSPanel extends JPanel {
         });
     }
 
-    // ---------------------------
-    // Public API
-    // ---------------------------
     public void setCheckoutHandler(CheckoutHandler handler) { this.checkoutHandler = handler; }
     public List<SaleItem> getCartSnapshot() { return new ArrayList<>(cart.values()); }
     public void clearCart() { cart.clear(); refreshCartTable(); }
 
-    /**
-     * Refreshes the product grid and repopulates filter dropdowns.
-     * Always safe to call (filters are created in constructor).
-     */
     public void refreshProducts(Collection<Product> products) {
         if (products == null) products = Collections.emptyList();
 
-        // update product map
         productMap.clear();
         for (Product p : products) productMap.put(p.getId(), p);
 
-        // populate filter sets
         Set<String> brands = new TreeSet<>();
         Set<String> colors = new TreeSet<>();
         Set<String> types = new TreeSet<>();
@@ -222,7 +207,7 @@ public class POSPanel extends JPanel {
             if (p.getType()  != null && !p.getType().isBlank())  types.add(p.getType());
         }
 
-        // populate combo boxes safely
+
         suppressFilterEvents = true;
         try {
             cbBrand.removeAllItems(); cbBrand.addItem("All Brands");
@@ -237,13 +222,12 @@ public class POSPanel extends JPanel {
             suppressFilterEvents = false;
         }
 
-        // finally update the grid (applies currently selected filter values)
+        // Update grid
         updateProductGrid(productMap.values());
-        //
         layoutGridToFitWidth();
     }
 
-    // update product grid using filter selections
+    // Update product grid using filter selections
     private void updateProductGrid(Collection<Product> products) {
         productGrid.removeAll();
 
@@ -265,35 +249,75 @@ public class POSPanel extends JPanel {
         productGrid.repaint();
     }
 
-    // ---------------------------
     // Product card & quantity dialog
-    // ---------------------------
+    private ImageIcon loadIconResource(String resourcePath, int w, int h) {
+        try {
+            // Try resource as stream (works inside IDE and inside jar)
+            var is = getClass().getResourceAsStream(resourcePath);
+            if (is != null) {
+                var img = javax.imageio.ImageIO.read(is);
+                if (img != null) {
+                    var scaled = img.getScaledInstance(w, h, Image.SCALE_SMOOTH);
+                    return new ImageIcon(scaled);
+                }
+            } else {
+                // debug: resource not found
+                // javax.swing.JOptionPane.showMessageDialog(this, "Resource not found: " + resourcePath);
+            }
+        } catch (Exception ex) {
+            // ignore and fallback
+        }
+        return null;
+    }
+
     private JPanel createProductCard(Product p) {
         JPanel card = new JPanel(new BorderLayout());
         card.setPreferredSize(new Dimension(150, 150));
         card.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200)));
         card.setBackground(Color.WHITE);
 
-        JLabel icon = new JLabel("🖌️", SwingConstants.CENTER);
-        icon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 36));
-        card.add(icon, BorderLayout.CENTER);
+        // Filename image
+        String imageName = switch (p.getId()) {
+            case "P001" -> "boysen_red.png";
+            case "P002" -> "boysen_white.png";
+            case "P003" -> "boysen_green.png";
+            case "P004" -> "davies_blue.png";
+            case "P005" -> "davies_yellow.png";
+            case "P006" -> "nation_black.png";
+            case "P007" -> "nation_gray.png";
+            default -> null;
+        };
+
+        ImageIcon icon = null;
+        if (imageName != null) {
+            icon = loadIconResource("/LTBPaintCenter/assets/" + imageName, 100, 100);
+        }
+
+        JLabel imgLabel;
+        if (icon != null) {
+            imgLabel = new JLabel(icon, SwingConstants.CENTER);
+        } else {
+            imgLabel = new JLabel("🖌️", SwingConstants.CENTER);
+            imgLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 36));
+        }
+        card.add(imgLabel, BorderLayout.CENTER);
 
         JLabel lblName = new JLabel("<html><center>" + p.getName() + "</center></html>", SwingConstants.CENTER);
         lblName.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         JLabel lblPrice = new JLabel(String.format("₱%.2f", p.getPrice()), SwingConstants.CENTER);
         lblPrice.setFont(new Font("Segoe UI", Font.BOLD, 12));
 
-        JPanel bottom = new JPanel(new GridLayout(2,1));
+        JPanel bottom = new JPanel(new GridLayout(2, 1));
         bottom.setBackground(Color.WHITE);
         bottom.add(lblName);
         bottom.add(lblPrice);
         card.add(bottom, BorderLayout.SOUTH);
 
         card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        card.addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent e) { openQuantityDialogAndAdd(p); }
-            @Override public void mouseEntered(MouseEvent e) { card.setBackground(new Color(245, 245, 245)); }
-            @Override public void mouseExited(MouseEvent e) { card.setBackground(Color.WHITE); }
+        card.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent e) { openQuantityDialogAndAdd(p); }
+            @Override public void mouseEntered(java.awt.event.MouseEvent e) { card.setBackground(new Color(245, 245, 245)); }
+            @Override public void mouseExited(java.awt.event.MouseEvent e) { card.setBackground(Color.WHITE); }
         });
 
         return card;
@@ -313,9 +337,7 @@ public class POSPanel extends JPanel {
         if (qty != null && qty > 0) addToCart(p, qty);
     }
 
-    // ---------------------------
     // Cart operations
-    // ---------------------------
     private void addToCart(Product p, int qty) {
         SaleItem existing = cart.get(p.getId());
         if (existing != null) existing.addQuantity(qty);
@@ -372,9 +394,7 @@ public class POSPanel extends JPanel {
         lblTotal.setText(String.format("Total: ₱%.2f", total));
     }
 
-    // ---------------------------
-    // Dialog
-    // ---------------------------
+    // Dialog box
     private static class QuantityDialog extends JDialog {
         private Integer result = null;
         private final JTextField txtQty;
@@ -382,7 +402,7 @@ public class POSPanel extends JPanel {
         public QuantityDialog(String name, int max) {
             setModal(true);
             setTitle("Select Quantity");
-            setSize(300, 160);
+            setSize(300, 180);
             setLocationRelativeTo(null);
             setLayout(new BorderLayout(8, 8));
             setDefaultCloseOperation(DISPOSE_ON_CLOSE);

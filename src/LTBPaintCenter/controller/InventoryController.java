@@ -9,6 +9,8 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Objects;
 
+
+    //InventoryController, handles all inventory management logic: add, update, delete, and table refresh.
 public class InventoryController {
     private final Inventory inventory;
     private final InventoryPanel view;
@@ -20,24 +22,30 @@ public class InventoryController {
         refreshInventory();
     }
 
-    private void attachListeners() {
-        view.getBtnAddUpdate().addActionListener(e -> addOrUpdate());
-        view.getBtnDelete().addActionListener(e -> delete());
-        view.getTable().addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                int r = view.getTable().getSelectedRow();
-                if (r >= 0) {
-                    view.getTfId().setText(view.getTable().getValueAt(r, 0).toString());
-                    view.getTfName().setText(view.getTable().getValueAt(r, 1).toString());
-                    view.getTfPrice().setText(view.getTable().getValueAt(r, 2).toString());
-                    view.getTfQty().setText(view.getTable().getValueAt(r, 3).toString());
-                }
-            }
-        });
-    }
+        private void attachListeners() {
+            view.getBtnAddUpdate().addActionListener(e -> addOrUpdate());
+            view.getBtnDelete().addActionListener(e -> delete());
+            view.getBtnClear().addActionListener(e -> clearForm());
 
-    private void addOrUpdate() {
+            // 🔍 Search field + Find button
+            view.getTfSearch().addActionListener(e -> performSearch());
+            view.getBtnSearch().addActionListener(e -> performSearch());
+
+            view.getTable().addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    int r = view.getTable().getSelectedRow();
+                    if (r >= 0) {
+                        view.getTfId().setText(view.getTable().getValueAt(r, 0).toString());
+                        view.getTfName().setText(view.getTable().getValueAt(r, 1).toString());
+                        view.getTfPrice().setText(view.getTable().getValueAt(r, 5).toString());
+                        view.getTfQty().setText(view.getTable().getValueAt(r, 6).toString());
+                    }
+                }
+            });
+        }
+
+        private void addOrUpdate() {
         String id = view.getTfId().getText().trim();
         String name = view.getTfName().getText().trim();
         String brand = Objects.requireNonNull(view.getCbBrand().getSelectedItem()).toString();
@@ -46,6 +54,7 @@ public class InventoryController {
 
         double price;
         int qty;
+
         try {
             price = Double.parseDouble(view.getTfPrice().getText().trim());
             qty = Integer.parseInt(view.getTfQty().getText().trim());
@@ -70,7 +79,29 @@ public class InventoryController {
         JOptionPane.showMessageDialog(view, "Product saved!");
     }
 
-    private void delete() {
+        private void performSearch() {
+            String query = view.getTfSearch().getText().trim().toLowerCase();
+
+            // If search box is empty, show all
+            if (query.isEmpty()) {
+                refreshInventory();
+                return;
+            }
+
+            var allProducts = inventory.getAll();
+            var filtered = allProducts.stream()
+                    .filter(p ->
+                            p.getId().toLowerCase().contains(query) ||
+                                    p.getName().toLowerCase().contains(query) ||
+                                    p.getBrand().toLowerCase().contains(query) ||
+                                    p.getColor().toLowerCase().contains(query) ||
+                                    p.getType().toLowerCase().contains(query))
+                    .toList();
+
+            view.refreshInventory(filtered);
+        }
+
+        private void delete() {
         String id = view.getTfId().getText().trim();
         if (id.isEmpty()) {
             JOptionPane.showMessageDialog(view, "Select a product first");
@@ -94,5 +125,16 @@ public class InventoryController {
         view.refreshInventory(inventory.getAll());
     }
 
-    public InventoryPanel getView() { return view; }
-}
+    public InventoryPanel getView() {
+        return view;
+    }
+
+        private void clearForm() {
+            view.getTfId().setText("");
+            view.getTfName().setText("");
+            view.getTfPrice().setText("");
+            view.getTfQty().setText("");
+            view.getTfSearch().setText("");
+            view.getTable().clearSelection();
+        }
+    }

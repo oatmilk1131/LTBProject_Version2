@@ -6,10 +6,11 @@ import LTBPaintCenter.view.POSPanel;
 import javax.swing.*;
 import java.util.List;
 
+    //POSController, manages checkout flow and updates product display.
 public class POSController {
-    private Inventory inventory;
-    private Report report;
-    private POSPanel view;
+    private final Inventory inventory;
+    private final Report report;
+    private final POSPanel view;
 
     public POSController(Inventory inventory, Report report) {
         this.inventory = inventory;
@@ -21,7 +22,6 @@ public class POSController {
     }
 
     private void attachHandlers() {
-        // Checkout logic provided as handler to POSPanel
         view.setCheckoutHandler(this::handleCheckout);
     }
 
@@ -44,10 +44,13 @@ public class POSController {
                 sale.addItem(item);
                 inventory.updateQuantity(item.getProductId(), -item.getQty());
             }
+
             report.recordSale(sale);
             JOptionPane.showMessageDialog(view, String.format("Sale recorded! Total: ₱%.2f", sale.getTotal()));
+
             refreshPOS();
             return true;
+
         } catch (Exception e) {
             JOptionPane.showMessageDialog(view, "Checkout failed: " + e.getMessage());
             return false;

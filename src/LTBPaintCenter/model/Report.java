@@ -3,8 +3,8 @@ package LTBPaintCenter.model;
 import java.util.*;
 
 public class Report {
-    private List<Sale> sales = new ArrayList<>();
-    private Map<String,Integer> cumulativeProductSales = new HashMap<>();
+    private final List<Sale> sales = new ArrayList<>();
+    private final Map<String,Integer> cumulativeProductSales = new HashMap<>();
 
     public void recordSale(Sale s) {
         sales.add(s);
@@ -13,11 +13,5 @@ public class Report {
                     cumulativeProductSales.getOrDefault(it.getProductId(),0) + it.getQty());
         }
     }
-
     public List<Sale> getSales() { return Collections.unmodifiableList(sales); }
-    public int getTotalSalesCount() { return sales.size(); }
-    public double getTotalRevenue() { return sales.stream().mapToDouble(Sale::getTotal).sum(); }
-
-    // Phase 2 addition: total items sold per product
-    public Map<String,Integer> getCumulativeProductSales() { return Collections.unmodifiableMap(cumulativeProductSales); }
 }
