@@ -363,40 +363,58 @@ public class POSPanel extends JPanel {
     private void removeSelectedCartItem() {
         int row = cartTable.getSelectedRow();
         if (row < 0) return;
-
-        // Convert string ID from table to integer
         String idStr = cartTableModel.getValueAt(row, 0).toString();
         int id = Integer.parseInt(idStr.replaceAll("\\D+", ""));
-
         cart.remove(id);
         refreshCartTable();
     }
 
 
     private void editSelectedCartQty() {
-        int r = cartTable.getSelectedRow();
-        if (r < 0) return;
+        int selectedRow = cartTable.getSelectedRow();
+        if (selectedRow < 0) return;
 
-        String idStr = cartTableModel.getValueAt(r, 0).toString();
-        int id = Integer.parseInt(idStr.replaceAll("\\D+", ""));
+        // Read the displayed ID from the table and extract numeric part (handles "P001" or "1")
+        Object cellValue = cartTableModel.getValueAt(selectedRow, 0);
+        if (cellValue == null) return;
 
-        SaleItem itm = cart.get(id);
-        if (itm == null) return;
+        String idStr = cellValue.toString().trim();
+        int id;
+        try {
+            id = Integer.parseInt(idStr.replaceAll("\\D+", "")); // strip non-digits safely
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Invalid product ID: " + idStr);
+            return;
+        }
 
-        Product prod = productMap.get(id);
-        int max = (prod != null) ? prod.getQuantity() : itm.getQty();
-        int cartQtyOther = cart.values().stream().mapToInt(SaleItem::getQty).sum() - itm.getQty();
-        int available = max - cartQtyOther;
-        if (available < 1) available = itm.getQty();
+        // Get SaleItem and Product by numeric ID
+        SaleItem item = cart.get(id);
+        if (item == null) return;
 
-        QuantityDialog qd = new QuantityDialog(itm.getName(), available);
-        Integer res = qd.showDialog();
-        if (res != null && res > 0) {
-            itm.setQty(res);
-            if (itm.getQty() <= 0) cart.remove(id);
+        Product product = productMap.get(id);
+        int max = (product != null) ? product.getQuantity() : item.getQty();
+
+        // Calculate available stock excluding this item's current qty
+        int cartQtyOther = cart.values().stream()
+                .filter(i -> i != item)
+                .mapToInt(SaleItem::getQty)
+                .sum();
+        int available = Math.max(max - cartQtyOther, item.getQty());
+
+        // Open quantity dialog
+        QuantityDialog qd = new QuantityDialog(item.getName(), available);
+        Integer newQty = qd.showDialog();
+
+        if (newQty != null) {
+            if (newQty <= 0) {
+                cart.remove(id);
+            } else {
+                item.setQty(newQty);
+            }
             refreshCartTable();
         }
     }
+
 
 
     private void updateTotal() {

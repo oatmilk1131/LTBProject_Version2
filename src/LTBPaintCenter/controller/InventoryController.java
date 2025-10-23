@@ -153,14 +153,14 @@ public class InventoryController {
             return;
         }
 
-        if (inventory.getProduct(id) == null) {
+        if (inventory.getProduct(Integer.parseInt(id)) == null) {
             JOptionPane.showMessageDialog(view, "Product not found");
             return;
         }
 
         int confirm = JOptionPane.showConfirmDialog(view, "Delete this product?", "Confirm", JOptionPane.YES_NO_OPTION);
         if (confirm == JOptionPane.YES_OPTION) {
-            inventory.removeProduct(id);
+            inventory.removeProduct(Integer.parseInt(id));
             refreshInventory();
             JOptionPane.showMessageDialog(view, "Deleted.");
         }
