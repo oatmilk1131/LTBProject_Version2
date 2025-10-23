@@ -1,0 +1,672 @@
+Subject: [PATCH] .
+---
+Index: src/LTBPaintCenter/view/MonitoringPanel.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/LTBPaintCenter/view/MonitoringPanel.java b/src/LTBPaintCenter/view/MonitoringPanel.java
+--- a/src/LTBPaintCenter/view/MonitoringPanel.java	(revision 441c40719100e67f9155dc922267b8c53ed00862)
++++ b/src/LTBPaintCenter/view/MonitoringPanel.java	(date 1761201417888)
+@@ -14,6 +14,7 @@
+ /**
+  * Monitoring panel for viewing sales records, applying filters,
+  * and visualizing revenue breakdown by brand or type.
++ * Now includes an alert section for expiring and low-stock products.
+  */
+ public class MonitoringPanel extends JPanel {
+     private final DefaultTableModel tableModel = new DefaultTableModel(
+@@ -42,6 +43,9 @@
+     private final JComboBox<String> cbChartMode = new JComboBox<>(new String[]{"Brand Revenue", "Type Revenue"});
+     private final BarChartPanel barChartPanel = new BarChartPanel();
+ 
++    // NEW: Alerts area for low-stock / expiring / expired products
++    private final JTextArea logArea = new JTextArea();
++
+     public MonitoringPanel() {
+         setLayout(new BorderLayout(8, 8));
+         setBackground(Color.WHITE);
+@@ -156,6 +160,19 @@
+         summaryContainer.add(chartHeader);
+         summaryContainer.add(barChartPanel);
+ 
++        // --- INVENTORY ALERT LOG AREA ---
++        logArea.setEditable(false);
++        logArea.setFont(new Font("Segoe UI", Font.PLAIN, 13));
++        logArea.setBackground(new Color(255, 250, 240)); // warm tone
++        logArea.setBorder(BorderFactory.createTitledBorder("Inventory Alerts"));
++        logArea.setLineWrap(true);
++        logArea.setWrapStyleWord(true);
++
++        JScrollPane logScroll = new JScrollPane(logArea);
++        logScroll.setPreferredSize(new Dimension(100, 120));
++        summaryContainer.add(Box.createVerticalStrut(10));
++        summaryContainer.add(logScroll);
++
+         add(summaryContainer, BorderLayout.SOUTH);
+     }
+ 
+@@ -209,6 +226,18 @@
+         taTypeSummary.setText(typeText);
+     }
+ 
++    // --- NEW: update alerts area ---
++    public void updateAlerts(List<String> alerts) {
++        logArea.setText("");
++        if (alerts == null || alerts.isEmpty()) {
++            logArea.setText("No alerts at this time.");
++        } else {
++            for (String alert : alerts) {
++                logArea.append(alert + "\n");
++            }
++        }
++    }
++
+     // GETTERS
+     public JButton getBtnApplyFilter() { return btnApplyFilter; }
+     public JButton getBtnClearFilter() { return btnClearFilter; }
+@@ -227,4 +256,7 @@
+     public JComboBox<String> getCbToYear()    { return cbToYear; }
+     public BarChartPanel getBarChartPanel()   { return barChartPanel; }
+     public JComboBox<String> getCbChartMode() { return cbChartMode; }
++
++    // NEW getter for alert area (for MonitoringController)
++    public JTextArea getLogArea() { return logArea; }
+ }
+Index: src/LTBPaintCenter/controller/MainController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/LTBPaintCenter/controller/MainController.java b/src/LTBPaintCenter/controller/MainController.java
+--- a/src/LTBPaintCenter/controller/MainController.java	(revision 441c40719100e67f9155dc922267b8c53ed00862)
++++ b/src/LTBPaintCenter/controller/MainController.java	(date 1761202614542)
+@@ -4,14 +4,15 @@
+ import LTBPaintCenter.view.MainFrame;
+ 
+ import javax.swing.*;
++import java.sql.*;
+ import java.util.List;
+ 
+-
+-    //Main Controller, manages application flow between POS, Inventory and Monitoring
++// Main Controller, manages application flow between POS, Inventory and Monitoring
+ public class MainController {
+     private final Inventory inventory;
+     private final Report report;
+     private MainFrame frame;
++    private InventoryDatabase db;
+ 
+     private POSController posController;
+     private InventoryController inventoryController;
+@@ -23,7 +24,15 @@
+         Global.inventory = inventory;
+         Global.report = report;
+ 
+-        seedData();
++        // connect MySQL and load data
++        db = new InventoryDatabase();
++        db.updateExpiredProducts();
++
++        if (isInventoryEmpty()) {
++            db.insertSeedData();
++        }
++        loadInventoryFromDB();
++
+         initializeControllers();
+         initializeFrame();
+ 
+@@ -71,13 +80,28 @@
+         }
+     }
+ 
+-    private void seedData() {
+-        inventory.addProduct(new Product("P001", "Boysen - Red Acrylic", 450.0, 30, "Boysen", "Red", "Acrylic"));
+-        inventory.addProduct(new Product("P002", "Boysen - White Latex", 420.0, 25, "Boysen", "White", "Latex"));
+-        inventory.addProduct(new Product("P003", "Boysen - Green Enamel", 470.0, 15, "Boysen", "Green", "Enamel"));
+-        inventory.addProduct(new Product("P004", "Davies - Blue Oil", 460.0, 20, "Davies", "Blue", "Oil"));
+-        inventory.addProduct(new Product("P005", "Davies - Yellow Latex", 440.0, 20, "Davies", "Yellow", "Latex"));
+-        inventory.addProduct(new Product("P006", "Nation - Black Primer", 400.0, 18, "Nation", "Black", "Primer"));
+-        inventory.addProduct(new Product("P007", "Nation - Gray Enamel", 430.0, 22, "Nation", "Gray", "Enamel"));
++    // ---------------------------------------------
++    // REPLACEMENT for seedData()
++    // ---------------------------------------------
++    private void loadInventoryFromDB() {
++        List<Product> products = db.loadActiveProducts();
++        for (Product p : products) {
++            inventory.addProduct(p);
++        }
+     }
+-}
+\ No newline at end of file
++
++    private boolean isInventoryEmpty() {
++        boolean empty = true;
++        String sql = "SELECT COUNT(*) FROM inventory";
++        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/ltb_paint", "root", "admin123");
++             Statement st = conn.createStatement();
++             ResultSet rs = st.executeQuery(sql)) {
++            if (rs.next() && rs.getInt(1) > 0) {
++                empty = false;
++            }
++        } catch (SQLException e) {
++            e.printStackTrace();
++        }
++        return empty;
++    }
++}
+Index: src/LTBPaintCenter/model/Product.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/LTBPaintCenter/model/Product.java b/src/LTBPaintCenter/model/Product.java
+--- a/src/LTBPaintCenter/model/Product.java	(revision 441c40719100e67f9155dc922267b8c53ed00862)
++++ b/src/LTBPaintCenter/model/Product.java	(date 1761200880034)
+@@ -1,14 +1,20 @@
+ package LTBPaintCenter.model;
+ 
++import java.time.LocalDate;
++
+ public class Product {
+-    private final String id;
++    private String id;
+     private String name;
+-    private double price;
+-    private int quantity;
+     private String brand;
+     private String color;
+     private String type;
++    private double price;
++    private int quantity;
++    private LocalDate dateImported;
++    private LocalDate expirationDate;
++    private String status; // "active" or "expired"
+ 
++    // Constructor for simple creation (like seeding)
+     public Product(String id, String name, double price, int quantity,
+                    String brand, String color, String type) {
+         this.id = id;
+@@ -18,22 +24,65 @@
+         this.brand = brand;
+         this.color = color;
+         this.type = type;
++        this.dateImported = LocalDate.now();
++        this.expirationDate = LocalDate.now().plusMonths(6);
++        this.status = "active";
++    }
++
++    // Constructor used when reading from MySQL
++    public Product(String id, String name, String brand, String color,
++                   String type, double price, int quantity,
++                   LocalDate dateImported, LocalDate expirationDate, String status) {
++        this.id = id;
++        this.name = name;
++        this.brand = brand;
++        this.color = color;
++        this.type = type;
++        this.price = price;
++        this.quantity = quantity;
++        this.dateImported = dateImported;
++        this.expirationDate = expirationDate;
++        this.status = status;
+     }
+ 
+-    // Getters
++    // Getters and setters
+     public String getId() { return id; }
++    public void setId(String id) { this.id = id; }
++
+     public String getName() { return name; }
+-    public double getPrice() { return price; }
+-    public int getQuantity() { return quantity; }
++    public void setName(String name) { this.name = name; }
++
+     public String getBrand() { return brand; }
++    public void setBrand(String brand) { this.brand = brand; }
++
+     public String getColor() { return color; }
++    public void setColor(String color) { this.color = color; }
++
+     public String getType() { return type; }
+-
+-    //Setters
+-    public void setQuantity(int q) { this.quantity = q; }
+-    public void setPrice(double p) { this.price = p; }
+-    public void setName(String n) { this.name = n; }
+-    public void setBrand(String brand) { this.brand = brand; }
+-    public void setColor(String color) { this.color = color; }
+     public void setType(String type) { this.type = type; }
+-}
+\ No newline at end of file
++
++    public double getPrice() { return price; }
++    public void setPrice(double price) { this.price = price; }
++
++    public int getQuantity() { return quantity; }
++    public void setQuantity(int quantity) { this.quantity = quantity; }
++
++    public LocalDate getDateImported() { return dateImported; }
++    public void setDateImported(LocalDate dateImported) { this.dateImported = dateImported; }
++
++    public LocalDate getExpirationDate() { return expirationDate; }
++    public void setExpirationDate(LocalDate expirationDate) { this.expirationDate = expirationDate; }
++
++    public String getStatus() { return status; }
++    public void setStatus(String status) { this.status = status; }
++
++    public boolean isExpired() {
++        return expirationDate != null && expirationDate.isBefore(LocalDate.now());
++    }
++
++    @Override
++    public String toString() {
++        return String.format("%s (%s) - ₱%.2f [%d pcs] %s",
++                name, type, price, quantity, status);
++    }
++}
+Index: src/LTBPaintCenter/controller/POSController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/LTBPaintCenter/controller/POSController.java b/src/LTBPaintCenter/controller/POSController.java
+--- a/src/LTBPaintCenter/controller/POSController.java	(revision 441c40719100e67f9155dc922267b8c53ed00862)
++++ b/src/LTBPaintCenter/controller/POSController.java	(date 1761201992104)
+@@ -4,9 +4,11 @@
+ import LTBPaintCenter.view.POSPanel;
+ 
+ import javax.swing.*;
++import java.text.SimpleDateFormat;
++import java.util.Date;
+ import java.util.List;
+ 
+-    //POSController, manages checkout flow and updates product display.
++// POSController, manages checkout flow and updates product display.
+ public class POSController {
+     private final Inventory inventory;
+     private final Report report;
+@@ -35,6 +37,7 @@
+         Sale sale = new Sale(saleId);
+ 
+         try {
++            double subtotal = 0;
+             for (SaleItem item : cart) {
+                 Product product = inventory.getProduct(item.getProductId());
+                 if (product == null) throw new Exception("Product not found: " + item.getName());
+@@ -42,11 +45,31 @@
+                     throw new Exception("Not enough stock for " + product.getName());
+ 
+                 sale.addItem(item);
++                subtotal += item.getSubtotal();
++            }
++
++            double vat = subtotal * 0.12;
++            double total = subtotal + vat;
++
++            // Step 1: Confirmation dialog before checkout
++            int confirm = JOptionPane.showConfirmDialog(
++                    view,
++                    String.format("Subtotal: ₱%.2f\nVAT (12%%): ₱%.2f\nTotal: ₱%.2f\n\nConfirm purchase?", subtotal, vat, total),
++                    "Confirm Checkout",
++                    JOptionPane.YES_NO_OPTION
++            );
++
++            if (confirm != JOptionPane.YES_OPTION) return false;
++
++            // Step 2: Finalize sale
++            for (SaleItem item : cart) {
+                 inventory.updateQuantity(item.getProductId(), -item.getQty());
+             }
+-
++            sale.setTotal(total);
+             report.recordSale(sale);
+-            JOptionPane.showMessageDialog(view, String.format("Sale recorded! Total: ₱%.2f", sale.getTotal()));
++
++            // Step 3: Show receipt
++            showReceiptWindow(sale, subtotal, vat, total);
+ 
+             refreshPOS();
+             return true;
+@@ -57,6 +80,33 @@
+         }
+     }
+ 
++    private void showReceiptWindow(Sale sale, double subtotal, double vat, double total) {
++        JTextArea receiptArea = new JTextArea();
++        receiptArea.setEditable(false);
++
++        StringBuilder sb = new StringBuilder();
++        sb.append("       LTB PAINT CENTER\n");
++        sb.append("    Official Sales Receipt\n");
++        sb.append("------------------------------------\n");
++        sb.append("Sale ID: ").append(sale.getId()).append("\n");
++        sb.append("Date: ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())).append("\n");
++        sb.append("------------------------------------\n");
++
++        for (SaleItem item : sale.getItems()) {
++            sb.append(String.format("%-20s x%-2d ₱%.2f\n", item.getName(), item.getQty(), item.getSubtotal()));
++        }
++
++        sb.append("------------------------------------\n");
++        sb.append(String.format("Subtotal:       ₱%.2f\n", subtotal));
++        sb.append(String.format("VAT (12%%):      ₱%.2f\n", vat));
++        sb.append(String.format("TOTAL:          ₱%.2f\n", total));
++        sb.append("------------------------------------\n");
++        sb.append("Thank you for your purchase!\n");
++
++        receiptArea.setText(sb.toString());
++        JOptionPane.showMessageDialog(view, new JScrollPane(receiptArea), "Receipt", JOptionPane.PLAIN_MESSAGE);
++    }
++
+     public void refreshPOS() {
+         view.refreshProducts(inventory.getAll());
+     }
+@@ -64,4 +114,4 @@
+     public POSPanel getView() {
+         return view;
+     }
+-}
+\ No newline at end of file
++}
+Index: src/LTBPaintCenter/model/SaleItem.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/LTBPaintCenter/model/SaleItem.java b/src/LTBPaintCenter/model/SaleItem.java
+--- a/src/LTBPaintCenter/model/SaleItem.java	(revision 441c40719100e67f9155dc922267b8c53ed00862)
++++ b/src/LTBPaintCenter/model/SaleItem.java	(date 1761200982776)
+@@ -13,15 +13,13 @@
+         this.qty = qty;
+     }
+ 
+-    public void addQuantity(int additional) {
+-        this.qty += additional;
+-    }
+-
+-    public double getSubtotal() { return price * qty; }
+     public String getProductId() { return productId; }
+     public String getName() { return name; }
+-    public int getQty() { return qty; }
+     public double getPrice() { return price; }
++    public int getQty() { return qty; }
+ 
+     public void setQty(int qty) { this.qty = qty; }
+-}
+\ No newline at end of file
++    public void addQuantity(int amount) { this.qty += amount; }
++
++    public double getSubtotal() { return price * qty; }
++}
+Index: src/LTBPaintCenter/controller/MonitoringController.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/LTBPaintCenter/controller/MonitoringController.java b/src/LTBPaintCenter/controller/MonitoringController.java
+--- a/src/LTBPaintCenter/controller/MonitoringController.java	(revision 441c40719100e67f9155dc922267b8c53ed00862)
++++ b/src/LTBPaintCenter/controller/MonitoringController.java	(date 1761200011901)
+@@ -7,7 +7,7 @@
+ import java.text.SimpleDateFormat;
+ import java.util.*;
+ 
+-    //MonitoringController, handles sales filtering, summary updates, and revenue chart visualization.
++// MonitoringController, handles sales filtering, summary updates, and revenue chart visualization.
+ public class MonitoringController {
+     private final Report report;
+     private final Inventory inventory;
+@@ -17,10 +17,15 @@
+     private final Map<String, Double> brandTotals = new LinkedHashMap<>();
+     private final Map<String, Double> typeTotals = new LinkedHashMap<>();
+ 
++    // Added reference to database for alert fetching
++    private final InventoryDatabase db;
++
+     public MonitoringController(Report report, Inventory inventory) {
+         this.report = report;
+         this.inventory = inventory;
+         this.view = new MonitoringPanel();
++        this.db = new InventoryDatabase();
++
+         attachListeners();
+         populateBrandFilter();
+         refresh();
+@@ -48,6 +53,9 @@
+         view.refreshSales(report.getSales());
+         updateBreakdownSummaries(report.getSales());
+         populateBrandFilter();
++
++        // Added: refresh logs for expiring and low-stock batches
++        updateInventoryAlerts();
+     }
+ 
+     private void populateBrandFilter() {
+@@ -162,4 +170,18 @@
+             view.getBarChartPanel().setData(brandTotals);
+         }
+     }
+-}
+\ No newline at end of file
++
++    // Added: displays product expiry and stock warnings under the summary panel
++    private void updateInventoryAlerts() {
++        List<String> alerts = db.getAlerts();
++        JTextArea logArea = view.getLogArea(); // this JTextArea should be in MonitoringPanel layout
++        logArea.setText("");
++        if (alerts.isEmpty()) {
++            logArea.append("No alerts to display.\\n");
++        } else {
++            for (String msg : alerts) {
++                logArea.append(msg + "\\n");
++            }
++        }
++    }
++}
+Index: src/LTBPaintCenter/model/Report.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/LTBPaintCenter/model/Report.java b/src/LTBPaintCenter/model/Report.java
+--- a/src/LTBPaintCenter/model/Report.java	(revision 441c40719100e67f9155dc922267b8c53ed00862)
++++ b/src/LTBPaintCenter/model/Report.java	(date 1761200998894)
+@@ -4,14 +4,27 @@
+ 
+ public class Report {
+     private final List<Sale> sales = new ArrayList<>();
+-    private final Map<String,Integer> cumulativeProductSales = new HashMap<>();
++    private final Map<String, Integer> cumulativeProductSales = new HashMap<>();
+ 
+     public void recordSale(Sale s) {
+         sales.add(s);
+-        for(SaleItem it : s.getItems()) {
+-            cumulativeProductSales.put(it.getProductId(),
+-                    cumulativeProductSales.getOrDefault(it.getProductId(),0) + it.getQty());
++        for (SaleItem it : s.getItems()) {
++            cumulativeProductSales.put(
++                    it.getProductId(),
++                    cumulativeProductSales.getOrDefault(it.getProductId(), 0) + it.getQty()
++            );
+         }
+     }
+-    public List<Sale> getSales() { return Collections.unmodifiableList(sales); }
+-}
+\ No newline at end of file
++
++    public List<Sale> getSales() {
++        return Collections.unmodifiableList(sales);
++    }
++
++    public int getTotalSold(String productId) {
++        return cumulativeProductSales.getOrDefault(productId, 0);
++    }
++
++    public double getTotalRevenue() {
++        return sales.stream().mapToDouble(Sale::getTotal).sum();
++    }
++}
+Index: src/LTBPaintCenter/model/Inventory.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/LTBPaintCenter/model/Inventory.java b/src/LTBPaintCenter/model/Inventory.java
+--- a/src/LTBPaintCenter/model/Inventory.java	(revision 441c40719100e67f9155dc922267b8c53ed00862)
++++ b/src/LTBPaintCenter/model/Inventory.java	(date 1761200974349)
+@@ -18,4 +18,19 @@
+             p.setQuantity(newQty);
+         }
+     }
+-}
+\ No newline at end of file
++
++    public void updateStatus(String id, String status) {
++        Product p = map.get(id);
++        if (p != null) p.setStatus(status);
++    }
++
++    public List<Product> getCriticalProducts() {
++        List<Product> list = new ArrayList<>();
++        for (Product p : map.values()) {
++            if (p.isExpired() || p.getQuantity() <= 5) {
++                list.add(p);
++            }
++        }
++        return list;
++    }
++}
+Index: src/LTBPaintCenter/model/Sale.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/LTBPaintCenter/model/Sale.java b/src/LTBPaintCenter/model/Sale.java
+--- a/src/LTBPaintCenter/model/Sale.java	(revision 441c40719100e67f9155dc922267b8c53ed00862)
++++ b/src/LTBPaintCenter/model/Sale.java	(date 1761201980635)
+@@ -13,9 +13,16 @@
+         this.date = new Date();
+     }
+ 
+-    public void addItem(SaleItem it) { items.add(it); total += it.getSubtotal(); }
++    public void addItem(SaleItem it) {
++        items.add(it);
++        total += it.getSubtotal();
++    }
++
+     public String getId() { return saleId; }
+     public Date getDate() { return date; }
+     public double getTotal() { return total; }
+     public List<SaleItem> getItems() { return items; }
+-}
+\ No newline at end of file
++
++    public void setTotal(double total) { this.total = total;
++    }
++}
+Index: .idea/misc.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.idea/misc.xml b/.idea/misc.xml
+--- a/.idea/misc.xml	(revision 441c40719100e67f9155dc922267b8c53ed00862)
++++ b/.idea/misc.xml	(date 1761201653799)
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <project version="4">
+-  <component name="ProjectRootManager" version="2" languageLevel="JDK_24" default="true" project-jdk-name="24" project-jdk-type="JavaSDK">
++  <component name="ProjectRootManager" version="2" languageLevel="JDK_21" default="true" project-jdk-name="temurin-21" project-jdk-type="JavaSDK">
+     <output url="file://$PROJECT_DIR$/out" />
+   </component>
+ </project>
+\ No newline at end of file
+Index: LTBProject.iml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/LTBProject.iml b/LTBProject.iml
+--- a/LTBProject.iml	(revision 441c40719100e67f9155dc922267b8c53ed00862)
++++ b/LTBProject.iml	(date 1761200648202)
+@@ -7,5 +7,23 @@
+     </content>
+     <orderEntry type="inheritedJdk" />
+     <orderEntry type="sourceFolder" forTests="false" />
++    <orderEntry type="module-library" exported="">
++      <library>
++        <CLASSES>
++          <root url="jar://$MODULE_DIR$/lib/mysql-connector-j-9.5.0.jar!/" />
++        </CLASSES>
++        <JAVADOC />
++        <SOURCES />
++      </library>
++    </orderEntry>
++    <orderEntry type="module-library" exported="">
++      <library>
++        <CLASSES>
++          <root url="jar://$MODULE_DIR$/lib/jcalendar-1.4.jar!/" />
++        </CLASSES>
++        <JAVADOC />
++        <SOURCES />
++      </library>
++    </orderEntry>
+   </component>
+ </module>
+\ No newline at end of file
+diff --git a/out/production/LTBProject/LTBPaintCenter/assets/boysen_green.png b/out/production/LTBProject/LTBPaintCenter/assets/boysen_green.png
+deleted file mode 100644
+index 13369a263677cf169a497c184b6452b37db66e04..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+Hc$@<O00001
+
+diff --git a/out/production/LTBProject/LTBPaintCenter/assets/boysen_red.png b/out/production/LTBProject/LTBPaintCenter/assets/boysen_red.png
+deleted file mode 100644
+index a3f5b2f1d17b384fb6430081cc20ac802b859796..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+Hc$@<O00001
+
+diff --git a/out/production/LTBProject/LTBPaintCenter/assets/boysen_white.png b/out/production/LTBProject/LTBPaintCenter/assets/boysen_white.png
+deleted file mode 100644
+index 195abcc626eb1cc7f68b66376ee77ecbe9b22ba6..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+Hc$@<O00001
+
+diff --git a/out/production/LTBProject/LTBPaintCenter/assets/davies_blue.png b/out/production/LTBProject/LTBPaintCenter/assets/davies_blue.png
+deleted file mode 100644
+index 59f9ff9ed1cb52b69ba758074fdd5b56454c632e..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+Hc$@<O00001
+
+diff --git a/out/production/LTBProject/LTBPaintCenter/assets/davies_yellow.png b/out/production/LTBProject/LTBPaintCenter/assets/davies_yellow.png
+deleted file mode 100644
+index 90ef8baf69e0c4cfb2f6c727f3e4a6dce0f60d3c..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+Hc$@<O00001
+
+diff --git a/out/production/LTBProject/LTBPaintCenter/assets/default_paint.png b/out/production/LTBProject/LTBPaintCenter/assets/default_paint.png
+deleted file mode 100644
+index d89c32d7b3eba72e12a568fcfc97fc0efabe4488..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+Hc$@<O00001
+
+diff --git a/out/production/LTBProject/LTBPaintCenter/assets/nation_black.png b/out/production/LTBProject/LTBPaintCenter/assets/nation_black.png
+deleted file mode 100644
+index d04044ad568b8b285796a4fc0156ddff6f9c4456..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+Hc$@<O00001
+
+diff --git a/out/production/LTBProject/LTBPaintCenter/assets/nation_gray.png b/out/production/LTBProject/LTBPaintCenter/assets/nation_gray.png
+deleted file mode 100644
+index da54909f7162b77edbd6fe1af990d7e81afcc267..0000000000000000000000000000000000000000
+GIT binary patch
+literal 0
+Hc$@<O00001
+
