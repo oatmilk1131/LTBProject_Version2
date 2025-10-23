@@ -29,8 +29,9 @@ public class POSPanel extends JPanel {
     private final JButton btnRemove = new JButton("Remove Selected");
 
     // Internal cart state
-    private final LinkedHashMap<String, SaleItem> cart = new LinkedHashMap<>();
-    private final Map<String, Product> productMap = new LinkedHashMap<>();
+    private Map<Integer, SaleItem> cart = new HashMap<>();
+    private Map<Integer, Product> productMap = new HashMap<>();
+
 
     // Filters
     private final JComboBox<String> cbBrand = new JComboBox<>();
@@ -175,12 +176,12 @@ public class POSPanel extends JPanel {
             }
             boolean ok = checkoutHandler.handleCheckout(getCartSnapshot());
             if (ok) {
-                JOptionPane.showMessageDialog(this, "Sale recorded!");
+                //JOptionPane.showMessageDialog(this, "Sale recorded!");
                 clearCart();
             }
         });
 
-        // Di gumagana
+        // Di gumagana xd
         cartTable.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) editSelectedCartQty();
@@ -278,13 +279,13 @@ public class POSPanel extends JPanel {
 
         // Filename image
         String imageName = switch (p.getId()) {
-            case "P001" -> "boysen_red.png";
+            /*case "P001" -> "boysen_red.png";
             case "P002" -> "boysen_white.png";
             case "P003" -> "boysen_green.png";
             case "P004" -> "davies_blue.png";
             case "P005" -> "davies_yellow.png";
             case "P006" -> "nation_black.png";
-            case "P007" -> "nation_gray.png";
+            case "P007" -> "nation_gray.png";*/
             default -> null;
         };
 
@@ -362,32 +363,59 @@ public class POSPanel extends JPanel {
     private void removeSelectedCartItem() {
         int row = cartTable.getSelectedRow();
         if (row < 0) return;
-        String id = cartTableModel.getValueAt(row, 0).toString();
+        String idStr = cartTableModel.getValueAt(row, 0).toString();
+        int id = Integer.parseInt(idStr.replaceAll("\\D+", ""));
         cart.remove(id);
         refreshCartTable();
     }
 
+
     private void editSelectedCartQty() {
-        int r = cartTable.getSelectedRow();
-        if (r < 0) return;
-        String id = cartTableModel.getValueAt(r, 0).toString();
-        SaleItem itm = cart.get(id);
-        if (itm == null) return;
+        int selectedRow = cartTable.getSelectedRow();
+        if (selectedRow < 0) return;
 
-        Product prod = productMap.get(id);
-        int max = (prod != null) ? prod.getQuantity() : itm.getQty();
-        int cartQtyOther = cart.values().stream().mapToInt(SaleItem::getQty).sum() - itm.getQty();
-        int available = max - cartQtyOther;
-        if (available < 1) available = itm.getQty();
+        // Read the displayed ID from the table and extract numeric part (handles "P001" or "1")
+        Object cellValue = cartTableModel.getValueAt(selectedRow, 0);
+        if (cellValue == null) return;
 
-        QuantityDialog qd = new QuantityDialog(itm.getName(), available);
-        Integer res = qd.showDialog();
-        if (res != null && res > 0) {
-            itm.setQty(res);
-            if (itm.getQty() <= 0) cart.remove(id);
+        String idStr = cellValue.toString().trim();
+        int id;
+        try {
+            id = Integer.parseInt(idStr.replaceAll("\\D+", "")); // strip non-digits safely
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Invalid product ID: " + idStr);
+            return;
+        }
+
+        // Get SaleItem and Product by numeric ID
+        SaleItem item = cart.get(id);
+        if (item == null) return;
+
+        Product product = productMap.get(id);
+        int max = (product != null) ? product.getQuantity() : item.getQty();
+
+        // Calculate available stock excluding this item's current qty
+        int cartQtyOther = cart.values().stream()
+                .filter(i -> i != item)
+                .mapToInt(SaleItem::getQty)
+                .sum();
+        int available = Math.max(max - cartQtyOther, item.getQty());
+
+        // Open quantity dialog
+        QuantityDialog qd = new QuantityDialog(item.getName(), available);
+        Integer newQty = qd.showDialog();
+
+        if (newQty != null) {
+            if (newQty <= 0) {
+                cart.remove(id);
+            } else {
+                item.setQty(newQty);
+            }
             refreshCartTable();
         }
     }
+
+
 
     private void updateTotal() {
         double total = cart.values().stream().mapToDouble(SaleItem::getSubtotal).sum();

@@ -44,13 +44,16 @@ public class MonitoringController {
         });
     }
 
-    public void refresh() {
-        view.refreshSales(report.getSales());
-        updateBreakdownSummaries(report.getSales());
-        populateBrandFilter();
-    }
+        public void refresh() {
+            List<Sale> allSales = report.getSales();
+            view.refreshSales(allSales);
 
-    private void populateBrandFilter() {
+            updateBreakdownSummaries(allSales);
+
+            populateBrandFilter();
+        }
+
+        private void populateBrandFilter() {
         Set<String> brands = new TreeSet<>();
         for (Product p : inventory.getAll()) {
             if (p.getBrand() != null && !p.getBrand().isBlank()) {
@@ -113,18 +116,49 @@ public class MonitoringController {
         }
     }
 
-    private void clearFilters() {
-        if (view.getCbFilterBrand().getItemCount() > 0) view.getCbFilterBrand().setSelectedIndex(0);
-        if (view.getCbFromDay() != null) view.getCbFromDay().setSelectedIndex(0);
-        if (view.getCbFromMonth() != null) view.getCbFromMonth().setSelectedIndex(0);
-        if (view.getCbFromYear() != null) view.getCbFromYear().setSelectedIndex(0);
-        if (view.getCbToDay() != null) view.getCbToDay().setSelectedIndex(0);
-        if (view.getCbToMonth() != null) view.getCbToMonth().setSelectedIndex(0);
-        if (view.getCbToYear() != null) view.getCbToYear().setSelectedIndex(0);
-        refresh();
-    }
+        private void clearFilters() {
+            // Reset brand filter
+            if (view.getCbFilterBrand() != null && view.getCbFilterBrand().getItemCount() > 0) {
+                view.getCbFilterBrand().setSelectedIndex(0);
+            }
 
-    private void updateBreakdownSummaries(Collection<Sale> sales) {
+            // Reset "From" date selectors using combo components
+            try {
+                java.lang.reflect.Field fDay = view.getClass().getDeclaredField("cbFromDay");
+                java.lang.reflect.Field fMonth = view.getClass().getDeclaredField("cbFromMonth");
+                java.lang.reflect.Field fYear = view.getClass().getDeclaredField("cbFromYear");
+                fDay.setAccessible(true);
+                fMonth.setAccessible(true);
+                fYear.setAccessible(true);
+                ((JComboBox<?>) fDay.get(view)).setSelectedIndex(0);
+                ((JComboBox<?>) fMonth.get(view)).setSelectedIndex(0);
+                ((JComboBox<?>) fYear.get(view)).setSelectedIndex(0);
+            } catch (Exception ignored) {}
+
+            // Reset "To" date selectors using combo components
+            try {
+                java.lang.reflect.Field fDay = view.getClass().getDeclaredField("cbToDay");
+                java.lang.reflect.Field fMonth = view.getClass().getDeclaredField("cbToMonth");
+                java.lang.reflect.Field fYear = view.getClass().getDeclaredField("cbToYear");
+                fDay.setAccessible(true);
+                fMonth.setAccessible(true);
+                fYear.setAccessible(true);
+                ((JComboBox<?>) fDay.get(view)).setSelectedIndex(0);
+                ((JComboBox<?>) fMonth.get(view)).setSelectedIndex(0);
+                ((JComboBox<?>) fYear.get(view)).setSelectedIndex(0);
+            } catch (Exception ignored) {}
+
+            // Reset chart mode
+            if (view.getCbChartMode() != null && view.getCbChartMode().getItemCount() > 0) {
+                view.getCbChartMode().setSelectedIndex(0);
+            }
+
+            refresh();
+        }
+
+
+
+        private void updateBreakdownSummaries(Collection<Sale> sales) {
         brandTotals.clear();
         typeTotals.clear();
 

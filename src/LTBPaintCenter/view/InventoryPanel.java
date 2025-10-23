@@ -49,7 +49,6 @@ public class InventoryPanel extends JPanel {
         topPanel.setBackground(Color.WHITE);
         topPanel.setBorder(BorderFactory.createTitledBorder("Product Details"));
 
-        // Row 1: Basic Info
         JPanel row1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
         row1.setBackground(Color.WHITE);
         row1.add(new JLabel("ID:"));   row1.add(tfId);
@@ -57,12 +56,14 @@ public class InventoryPanel extends JPanel {
         row1.add(new JLabel("Price:"));row1.add(tfPrice);
         row1.add(new JLabel("Qty:"));  row1.add(tfQty);
 
-        // Row 2: Categorization
         JPanel row2 = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
         row2.setBackground(Color.WHITE);
         addLabeledCombo(row2, "Brand:", cbBrand);
         addLabeledCombo(row2, "Color:", cbColor);
         addLabeledCombo(row2, "Type:", cbType);
+        cbBrand.setEditable(true);
+        cbColor.setEditable(true);
+        cbType.setEditable(true);
 
         JPanel formSection = new JPanel(new GridLayout(2, 1));
         formSection.setBackground(Color.WHITE);
@@ -153,12 +154,36 @@ public class InventoryPanel extends JPanel {
         model.setRowCount(0);
         for (Product p : products) {
             model.addRow(new Object[]{
-                    p.getId(), p.getName(), p.getBrand(),
-                    p.getColor(), p.getType(),
-                    String.format("%.2f", p.getPrice()), p.getQuantity()
+                    p.getDisplayId(),
+                    p.getName(),
+                    p.getBrand(),
+                    p.getColor(),
+                    p.getType(),
+                    String.format("%.2f", p.getPrice()),
+                    p.getQuantity()
             });
         }
         updateCombos(products);
+    }
+
+
+    public static String formatProductId(String id) {
+        return "P"+id;
+    }
+
+    public void populateCombos(Collection<String> brands, Collection<String> colors, Collection<String> types) {
+        cbBrand.removeAllItems();
+        cbColor.removeAllItems();
+        cbType.removeAllItems();
+
+        cbBrand.addItem("Select Brand");
+        for (String b : brands) cbBrand.addItem(b);
+
+        cbColor.addItem("Select Color");
+        for (String c : colors) cbColor.addItem(c);
+
+        cbType.addItem("Select Type");
+        for (String t : types) cbType.addItem(t);
     }
 
     private void updateCombos(Collection<Product> products) {
