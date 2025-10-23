@@ -14,6 +14,7 @@ import java.util.List;
 /**
  * Monitoring panel for viewing sales records, applying filters,
  * and visualizing revenue breakdown by brand or type.
+ * Now includes an alert section for expiring and low-stock products.
  */
 public class MonitoringPanel extends JPanel {
     private final DefaultTableModel tableModel = new DefaultTableModel(
@@ -41,6 +42,9 @@ public class MonitoringPanel extends JPanel {
     private final JTextArea taTypeSummary = new JTextArea();
     private final JComboBox<String> cbChartMode = new JComboBox<>(new String[]{"Brand Revenue", "Type Revenue"});
     private final BarChartPanel barChartPanel = new BarChartPanel();
+
+    // NEW: Alerts area for low-stock / expiring / expired products
+    private final JTextArea logArea = new JTextArea();
 
     public MonitoringPanel() {
         setLayout(new BorderLayout(8, 8));
@@ -156,6 +160,19 @@ public class MonitoringPanel extends JPanel {
         summaryContainer.add(chartHeader);
         summaryContainer.add(barChartPanel);
 
+        // --- INVENTORY ALERT LOG AREA ---
+        logArea.setEditable(false);
+        logArea.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        logArea.setBackground(new Color(255, 250, 240)); // warm tone
+        logArea.setBorder(BorderFactory.createTitledBorder("Inventory Alerts"));
+        logArea.setLineWrap(true);
+        logArea.setWrapStyleWord(true);
+
+        JScrollPane logScroll = new JScrollPane(logArea);
+        logScroll.setPreferredSize(new Dimension(100, 120));
+        summaryContainer.add(Box.createVerticalStrut(10));
+        summaryContainer.add(logScroll);
+
         add(summaryContainer, BorderLayout.SOUTH);
     }
 
@@ -209,6 +226,18 @@ public class MonitoringPanel extends JPanel {
         taTypeSummary.setText(typeText);
     }
 
+    // --- NEW: update alerts area ---
+    public void updateAlerts(List<String> alerts) {
+        logArea.setText("");
+        if (alerts == null || alerts.isEmpty()) {
+            logArea.setText("No alerts at this time.");
+        } else {
+            for (String alert : alerts) {
+                logArea.append(alert + "\n");
+            }
+        }
+    }
+
     // GETTERS
     public JButton getBtnApplyFilter() { return btnApplyFilter; }
     public JButton getBtnClearFilter() { return btnClearFilter; }
@@ -227,4 +256,7 @@ public class MonitoringPanel extends JPanel {
     public JComboBox<String> getCbToYear()    { return cbToYear; }
     public BarChartPanel getBarChartPanel()   { return barChartPanel; }
     public JComboBox<String> getCbChartMode() { return cbChartMode; }
+
+    // NEW getter for alert area (for MonitoringController)
+    public JTextArea getLogArea() { return logArea; }
 }

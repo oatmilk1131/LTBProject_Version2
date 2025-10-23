@@ -7,7 +7,7 @@ import javax.swing.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-    //MonitoringController, handles sales filtering, summary updates, and revenue chart visualization.
+// MonitoringController, handles sales filtering, summary updates, and revenue chart visualization.
 public class MonitoringController {
     private final Report report;
     private final Inventory inventory;
@@ -17,10 +17,15 @@ public class MonitoringController {
     private final Map<String, Double> brandTotals = new LinkedHashMap<>();
     private final Map<String, Double> typeTotals = new LinkedHashMap<>();
 
+    // Added reference to database for alert fetching
+    private final InventoryDatabase db;
+
     public MonitoringController(Report report, Inventory inventory) {
         this.report = report;
         this.inventory = inventory;
         this.view = new MonitoringPanel();
+        this.db = new InventoryDatabase();
+
         attachListeners();
         populateBrandFilter();
         refresh();
@@ -48,6 +53,9 @@ public class MonitoringController {
         view.refreshSales(report.getSales());
         updateBreakdownSummaries(report.getSales());
         populateBrandFilter();
+
+        // Added: refresh logs for expiring and low-stock batches
+        updateInventoryAlerts();
     }
 
     private void populateBrandFilter() {
@@ -160,6 +168,20 @@ public class MonitoringController {
             view.getBarChartPanel().setData(typeTotals);
         } else {
             view.getBarChartPanel().setData(brandTotals);
+        }
+    }
+
+    // Added: displays product expiry and stock warnings under the summary panel
+    private void updateInventoryAlerts() {
+        List<String> alerts = db.getAlerts();
+        JTextArea logArea = view.getLogArea(); // this JTextArea should be in MonitoringPanel layout
+        logArea.setText("");
+        if (alerts.isEmpty()) {
+            logArea.append("No alerts to display.\\n");
+        } else {
+            for (String msg : alerts) {
+                logArea.append(msg + "\\n");
+            }
         }
     }
 }

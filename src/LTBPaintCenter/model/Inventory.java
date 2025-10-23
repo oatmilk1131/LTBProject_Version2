@@ -18,4 +18,19 @@ public class Inventory {
             p.setQuantity(newQty);
         }
     }
+
+    public void updateStatus(String id, String status) {
+        Product p = map.get(id);
+        if (p != null) p.setStatus(status);
+    }
+
+    public List<Product> getCriticalProducts() {
+        List<Product> list = new ArrayList<>();
+        for (Product p : map.values()) {
+            if (p.isExpired() || p.getQuantity() <= 5) {
+                list.add(p);
+            }
+        }
+        return list;
+    }
 }

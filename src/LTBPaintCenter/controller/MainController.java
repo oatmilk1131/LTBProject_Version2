@@ -4,14 +4,15 @@ import LTBPaintCenter.model.*;
 import LTBPaintCenter.view.MainFrame;
 
 import javax.swing.*;
+import java.sql.*;
 import java.util.List;
 
-
-    //Main Controller, manages application flow between POS, Inventory and Monitoring
+// Main Controller, manages application flow between POS, Inventory and Monitoring
 public class MainController {
     private final Inventory inventory;
     private final Report report;
     private MainFrame frame;
+    private InventoryDatabase db;
 
     private POSController posController;
     private InventoryController inventoryController;
@@ -23,7 +24,15 @@ public class MainController {
         Global.inventory = inventory;
         Global.report = report;
 
-        seedData();
+        // connect MySQL and load data
+        db = new InventoryDatabase();
+        db.updateExpiredProducts();
+
+        if (isInventoryEmpty()) {
+            db.insertSeedData();
+        }
+        loadInventoryFromDB();
+
         initializeControllers();
         initializeFrame();
 
@@ -71,13 +80,28 @@ public class MainController {
         }
     }
 
-    private void seedData() {
-        inventory.addProduct(new Product("P001", "Boysen - Red Acrylic", 450.0, 30, "Boysen", "Red", "Acrylic"));
-        inventory.addProduct(new Product("P002", "Boysen - White Latex", 420.0, 25, "Boysen", "White", "Latex"));
-        inventory.addProduct(new Product("P003", "Boysen - Green Enamel", 470.0, 15, "Boysen", "Green", "Enamel"));
-        inventory.addProduct(new Product("P004", "Davies - Blue Oil", 460.0, 20, "Davies", "Blue", "Oil"));
-        inventory.addProduct(new Product("P005", "Davies - Yellow Latex", 440.0, 20, "Davies", "Yellow", "Latex"));
-        inventory.addProduct(new Product("P006", "Nation - Black Primer", 400.0, 18, "Nation", "Black", "Primer"));
-        inventory.addProduct(new Product("P007", "Nation - Gray Enamel", 430.0, 22, "Nation", "Gray", "Enamel"));
+    // ---------------------------------------------
+    // REPLACEMENT for seedData()
+    // ---------------------------------------------
+    private void loadInventoryFromDB() {
+        List<Product> products = db.loadActiveProducts();
+        for (Product p : products) {
+            inventory.addProduct(p);
+        }
+    }
+
+    private boolean isInventoryEmpty() {
+        boolean empty = true;
+        String sql = "SELECT COUNT(*) FROM inventory";
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/ltb_paint", "root", "admin123");
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            if (rs.next() && rs.getInt(1) > 0) {
+                empty = false;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return empty;
     }
 }

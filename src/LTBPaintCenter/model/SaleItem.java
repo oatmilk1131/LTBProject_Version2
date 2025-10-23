@@ -13,15 +13,13 @@ public class SaleItem {
         this.qty = qty;
     }
 
-    public void addQuantity(int additional) {
-        this.qty += additional;
-    }
-
-    public double getSubtotal() { return price * qty; }
     public String getProductId() { return productId; }
     public String getName() { return name; }
-    public int getQty() { return qty; }
     public double getPrice() { return price; }
+    public int getQty() { return qty; }
 
     public void setQty(int qty) { this.qty = qty; }
+    public void addQuantity(int amount) { this.qty += amount; }
+
+    public double getSubtotal() { return price * qty; }
 }

@@ -13,9 +13,16 @@ public class Sale {
         this.date = new Date();
     }
 
-    public void addItem(SaleItem it) { items.add(it); total += it.getSubtotal(); }
+    public void addItem(SaleItem it) {
+        items.add(it);
+        total += it.getSubtotal();
+    }
+
     public String getId() { return saleId; }
     public Date getDate() { return date; }
     public double getTotal() { return total; }
     public List<SaleItem> getItems() { return items; }
+
+    public void setTotal(double total) { this.total = total;
+    }
 }
