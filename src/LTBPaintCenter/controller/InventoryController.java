@@ -2,6 +2,7 @@ package LTBPaintCenter.controller;
 
 import LTBPaintCenter.model.Inventory;
 import LTBPaintCenter.model.Product;
+import LTBPaintCenter.model.ProductDAO;
 import LTBPaintCenter.view.InventoryPanel;
 
 import javax.swing.*;
@@ -27,7 +28,7 @@ public class InventoryController {
             view.getBtnDelete().addActionListener(e -> delete());
             view.getBtnClear().addActionListener(e -> clearForm());
 
-            // 🔍 Search field + Find button
+            //Search field + Find button
             view.getTfSearch().addActionListener(e -> performSearch());
             view.getBtnSearch().addActionListener(e -> performSearch());
 
@@ -122,7 +123,7 @@ public class InventoryController {
     }
 
     public void refreshInventory() {
-        view.refreshInventory(inventory.getAll());
+        view.refreshInventory(ProductDAO.getAllProducts());
     }
 
     public InventoryPanel getView() {
