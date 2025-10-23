@@ -6,17 +6,8 @@ import java.sql.SQLException;
 
 public class Database {
     private static final String URL = "jdbc:sqlite:ltbpaintcenter.db";
-    private static Connection connection;
 
-    public static Connection getConnection() {
-        if (connection == null) {
-            try {
-                connection = DriverManager.getConnection(URL);
-                System.out.println("Connected to SQLite database.");
-            } catch (SQLException e) {
-                System.err.println("Failed to connect: " + e.getMessage());
-            }
-        }
-        return connection;
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(URL);
     }
 }
