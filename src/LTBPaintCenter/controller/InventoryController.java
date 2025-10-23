@@ -8,6 +8,7 @@ import LTBPaintCenter.view.InventoryPanel;
 import javax.swing.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.List;
 import java.util.Objects;
 
 
@@ -60,41 +61,70 @@ public class InventoryController {
                 price = Double.parseDouble(view.getTfPrice().getText().trim());
                 qty = Integer.parseInt(view.getTfQty().getText().trim());
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(view, "Invalid price or quantity value.");
+                JOptionPane.showMessageDialog(view, "Invalid price or quantity.");
                 return;
             }
 
-            try {
-                if (idText.isEmpty()) {
-                    // --- ADD NEW PRODUCT ---
-                    Product newProduct = new Product("0", name, price, qty, brand, color, type);
-                    ProductDAO.addProduct(newProduct);
+            // parse id: allow display format like "P001" or just "1"
+            Integer parsedId = parseIdText(idText);
 
-                    JOptionPane.showMessageDialog(view, "✅ New product added successfully!");
-                } else {
-                    // --- UPDATE EXISTING PRODUCT ---
-                    int id = Integer.parseInt(idText);
-                    Product updated = new Product(idText, name, price, qty, brand, color, type);
-                    ProductDAO.updateProduct(updated);
+            // run DB operations off the EDT
+            new javax.swing.SwingWorker<Void, Void>() {
+                private Exception thrown;
 
-                    JOptionPane.showMessageDialog(view, "✅ Product updated successfully!");
+                @Override
+                protected Void doInBackground() {
+                    try {
+                        if (parsedId == null) {
+                            // add new
+                            Product newProduct = new Product(0, name, price, qty, brand, color, type);
+                            int newId = ProductDAO.addProduct(newProduct); // returns generated id
+                            newProduct.setId(newId);
+                        } else {
+                            // update existing
+                            Product updated = new Product(parsedId, name, price, qty, brand, color, type);
+                            ProductDAO.updateProduct(updated);
+                        }
+                    } catch (Exception e) {
+                        this.thrown = e;
+                    }
+                    return null;
                 }
 
-                // --- REFRESH TABLE AFTER OPERATION ---
-                view.refreshInventory(ProductDAO.getAllProducts());
+                @Override
+                protected void done() {
+                    if (thrown != null) {
+                        JOptionPane.showMessageDialog(view, "Database error: " + thrown.getMessage());
+                        thrown.printStackTrace();
+                        return;
+                    }
 
-                // --- Clear input fields if desired ---
-                //clearFields();
+                    // refresh UI from DB
+                    view.refreshInventory(ProductDAO.getAllProducts());
 
-            } catch (Exception e) {
-                JOptionPane.showMessageDialog(view, "❌ Database error: " + e.getMessage());
-                e.printStackTrace();
-            }
+                    // set id field to newly created ID display if it was an insert
+                    if (parsedId == null) {
+                        // pick the last product inserted (safe because we set generated ID to model in DAO)
+                        List<Product> all = ProductDAO.getAllProducts();
+                        if (!all.isEmpty()) {
+                            Product last = all.get(all.size() - 1);
+                            view.getTfId().setText(last.getDisplayId());
+                        }
+                    } else {
+                        view.getTfId().setText(String.format("P%03d", parsedId));
+                    }
+
+                    clearFields();
+                    JOptionPane.showMessageDialog(view, "Product saved!");
+                }
+            }.execute();
         }
+
 
 
         private void performSearch() {
             String query = view.getTfSearch().getText().trim().toLowerCase();
+
 
             // If search box is empty, show all
             if (query.isEmpty()) {
@@ -105,7 +135,8 @@ public class InventoryController {
             var allProducts = inventory.getAll();
             var filtered = allProducts.stream()
                     .filter(p ->
-                            p.getId().toLowerCase().contains(query) ||
+                            String.valueOf(p.getId()).contains(query)
+                                    ||
                                     p.getName().toLowerCase().contains(query) ||
                                     p.getBrand().toLowerCase().contains(query) ||
                                     p.getColor().toLowerCase().contains(query) ||
@@ -143,12 +174,33 @@ public class InventoryController {
         return view;
     }
 
-        private void clearForm() {
+    private void clearForm() {
             view.getTfId().setText("");
             view.getTfName().setText("");
             view.getTfPrice().setText("");
             view.getTfQty().setText("");
             view.getTfSearch().setText("");
             view.getTable().clearSelection();
+    }
+        private Integer parseIdText(String idText) {
+            if (idText == null || idText.isBlank()) return null;
+            String digits = idText.replaceAll("\\D+", "");
+            if (digits.isEmpty()) return null;
+            try {
+                return Integer.parseInt(digits);
+            } catch (NumberFormatException e) {
+                return null;
+            }
         }
+
+        private void clearFields() {
+            view.getTfId().setText("");
+            view.getTfName().setText("");
+            view.getTfPrice().setText("");
+            view.getTfQty().setText("");
+            view.getCbBrand().setSelectedIndex(0);
+            view.getCbColor().setSelectedIndex(0);
+            view.getCbType().setSelectedIndex(0);
+        }
+
     }

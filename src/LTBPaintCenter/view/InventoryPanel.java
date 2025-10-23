@@ -153,13 +153,18 @@ public class InventoryPanel extends JPanel {
         model.setRowCount(0);
         for (Product p : products) {
             model.addRow(new Object[]{
-                    formatProductId(p.getId()), p.getName(), p.getBrand(),
-                    p.getColor(), p.getType(),
-                    String.format("%.2f", p.getPrice()), p.getQuantity()
+                    p.getDisplayId(), // formatted "Pxxx"
+                    p.getName(),
+                    p.getBrand(),
+                    p.getColor(),
+                    p.getType(),
+                    String.format("%.2f", p.getPrice()),
+                    p.getQuantity()
             });
         }
         updateCombos(products);
     }
+
 
     public static String formatProductId(String id) {
         return "P"+id;

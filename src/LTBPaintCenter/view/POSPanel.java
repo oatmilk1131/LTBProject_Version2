@@ -29,8 +29,9 @@ public class POSPanel extends JPanel {
     private final JButton btnRemove = new JButton("Remove Selected");
 
     // Internal cart state
-    private final LinkedHashMap<String, SaleItem> cart = new LinkedHashMap<>();
-    private final Map<String, Product> productMap = new LinkedHashMap<>();
+    private Map<Integer, SaleItem> cart = new HashMap<>();
+    private Map<Integer, Product> productMap = new HashMap<>();
+
 
     // Filters
     private final JComboBox<String> cbBrand = new JComboBox<>();
@@ -278,13 +279,13 @@ public class POSPanel extends JPanel {
 
         // Filename image
         String imageName = switch (p.getId()) {
-            case "P001" -> "boysen_red.png";
+            /*case "P001" -> "boysen_red.png";
             case "P002" -> "boysen_white.png";
             case "P003" -> "boysen_green.png";
             case "P004" -> "davies_blue.png";
             case "P005" -> "davies_yellow.png";
             case "P006" -> "nation_black.png";
-            case "P007" -> "nation_gray.png";
+            case "P007" -> "nation_gray.png";*/
             default -> null;
         };
 
@@ -362,15 +363,23 @@ public class POSPanel extends JPanel {
     private void removeSelectedCartItem() {
         int row = cartTable.getSelectedRow();
         if (row < 0) return;
-        String id = cartTableModel.getValueAt(row, 0).toString();
+
+        // Convert string ID from table to integer
+        String idStr = cartTableModel.getValueAt(row, 0).toString();
+        int id = Integer.parseInt(idStr.replaceAll("\\D+", ""));
+
         cart.remove(id);
         refreshCartTable();
     }
 
+
     private void editSelectedCartQty() {
         int r = cartTable.getSelectedRow();
         if (r < 0) return;
-        String id = cartTableModel.getValueAt(r, 0).toString();
+
+        String idStr = cartTableModel.getValueAt(r, 0).toString();
+        int id = Integer.parseInt(idStr.replaceAll("\\D+", ""));
+
         SaleItem itm = cart.get(id);
         if (itm == null) return;
 
@@ -388,6 +397,7 @@ public class POSPanel extends JPanel {
             refreshCartTable();
         }
     }
+
 
     private void updateTotal() {
         double total = cart.values().stream().mapToDouble(SaleItem::getSubtotal).sum();

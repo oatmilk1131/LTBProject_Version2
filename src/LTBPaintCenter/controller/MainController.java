@@ -4,6 +4,7 @@ import LTBPaintCenter.model.*;
 import LTBPaintCenter.view.MainFrame;
 
 import javax.swing.*;
+import java.sql.SQLException;
 import java.util.List;
 
 
@@ -72,23 +73,34 @@ public class MainController {
     }
 
         public static void seedData() {
-            // Ensure database and table exist
             DatabaseSetup.initialize();
 
-            // Check if there are already products in the database
-            //List<Product> existing = ProductDAO.getAllProducts();
-            if (ProductDAO.getAllProducts().isEmpty()) {
-                System.out.println("Seeding default products into database...");
+            List<Product> existing = ProductDAO.getAllProducts();
+            if (!existing.isEmpty()) {
+                System.out.println("📦 Products already exist — skipping seed.");
+                return;
+            }
 
-                ProductDAO.addProduct(new Product("P001", "Boysen - Red Acrylic", 450.0, 30, "Boysen", "Red", "Acrylic"));
-                ProductDAO.addProduct(new Product("P002", "Boysen - White Latex", 420.0, 25, "Boysen", "White", "Latex"));
-                ProductDAO.addProduct(new Product("P002", "Boysen - White Latex", 420.0, 25, "Boysen", "White", "Latex"));
-                ProductDAO.addProduct(new Product("P004", "Davies - Blue Oil", 460.0, 20, "Davies", "Blue", "Oil"));
-                ProductDAO.addProduct(new Product("P005", "Davies - Yellow Latex", 440.0, 20, "Davies", "Yellow", "Latex"));
+            System.out.println("🌱 Seeding default products into database...");
 
-                System.out.println("Seed data inserted.");
-            } else {
-                System.out.println("Products already exist — skipping seed.");
+            // Use DAO with transactions if inserting many items; here we keep it simple
+            try {
+                Product p1 = new Product(0, "LTB Acrylic Paint Red", 149.99, 50, "LTB", "Red", "Acrylic");
+                Product p2 = new Product(0, "LTB Enamel Paint Blue", 129.99, 30, "LTB", "Blue", "Enamel");
+                Product p3 = new Product(0, "LTB Latex Paint White", 99.99, 40, "LTB", "White", "Latex");
+                Product p4 = new Product(0, "LTB Primer Gray", 89.99, 25, "LTB", "Gray", "Primer");
+                Product p5 = new Product(0, "LTB Wood Stain Walnut", 129.50, 20, "LTB", "Brown", "Wood");
+
+                ProductDAO.addProduct(p1);
+                ProductDAO.addProduct(p2);
+                ProductDAO.addProduct(p3);
+                ProductDAO.addProduct(p4);
+                ProductDAO.addProduct(p5);
+
+                System.out.println("✅ Seed data inserted.");
+            } catch (SQLException e) {
+                System.err.println("❌ Seeding failed: " + e.getMessage());
+                e.printStackTrace();
             }
         }
 

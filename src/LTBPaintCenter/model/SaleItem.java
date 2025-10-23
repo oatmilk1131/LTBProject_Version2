@@ -1,12 +1,12 @@
 package LTBPaintCenter.model;
 
 public class SaleItem {
-    private final String productId;
+    private final int productId;
     private final String name;
     private final double price;
     private int qty;
 
-    public SaleItem(String productId, String name, double price, int qty) {
+    public SaleItem(int productId, String name, double price, int qty) {
         this.productId = productId;
         this.name = name;
         this.price = price;
@@ -18,7 +18,7 @@ public class SaleItem {
     }
 
     public double getSubtotal() { return price * qty; }
-    public String getProductId() { return productId; }
+    public int getProductId() { return productId; }
     public String getName() { return name; }
     public int getQty() { return qty; }
     public double getPrice() { return price; }
