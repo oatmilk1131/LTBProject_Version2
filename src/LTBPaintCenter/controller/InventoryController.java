@@ -65,10 +65,8 @@ public class InventoryController {
                 return;
             }
 
-            // parse id: allow display format like "P001" or just "1"
             Integer parsedId = parseIdText(idText);
 
-            // run DB operations off the EDT
             new javax.swing.SwingWorker<Void, Void>() {
                 private Exception thrown;
 
@@ -78,7 +76,7 @@ public class InventoryController {
                         if (parsedId == null) {
                             // add new
                             Product newProduct = new Product(0, name, price, qty, brand, color, type);
-                            int newId = ProductDAO.addProduct(newProduct); // returns generated id
+                            int newId = ProductDAO.addProduct(newProduct);
                             newProduct.setId(newId);
                         } else {
                             // update existing
@@ -99,17 +97,19 @@ public class InventoryController {
                         return;
                     }
 
-                    // refresh UI from DB
-                    view.refreshInventory(ProductDAO.getAllProducts());
+                    inventory.clear();
+                    List<Product> updatedList = ProductDAO.getAllProducts();
+                    for (Product p : updatedList) {
+                        inventory.addProduct(p);
+                    }
 
-                    // set id field to newly created ID display if it was an insert
+                    // ✅ Step 2: refresh the table view using updated DB data
+                    view.refreshInventory(updatedList);
+
+                    // ✅ Step 3: show correct ID in form
                     if (parsedId == null) {
-                        // pick the last product inserted (safe because we set generated ID to model in DAO)
-                        List<Product> all = ProductDAO.getAllProducts();
-                        if (!all.isEmpty()) {
-                            Product last = all.get(all.size() - 1);
-                            view.getTfId().setText(last.getDisplayId());
-                        }
+                        Product last = updatedList.get(updatedList.size() - 1);
+                        view.getTfId().setText(String.format("P%03d", last.getId()));
                     } else {
                         view.getTfId().setText(String.format("P%03d", parsedId));
                     }
@@ -120,27 +120,25 @@ public class InventoryController {
             }.execute();
         }
 
-
-
         private void performSearch() {
             String query = view.getTfSearch().getText().trim().toLowerCase();
 
-
-            // If search box is empty, show all
+            // If search box is empty, show all products from DB
             if (query.isEmpty()) {
                 refreshInventory();
                 return;
             }
 
-            var allProducts = inventory.getAll();
+            // ✅ Fetch products directly from SQLite
+            List<Product> allProducts = ProductDAO.getAllProducts();
+
             var filtered = allProducts.stream()
                     .filter(p ->
                             String.valueOf(p.getId()).contains(query)
-                                    ||
-                                    p.getName().toLowerCase().contains(query) ||
-                                    p.getBrand().toLowerCase().contains(query) ||
-                                    p.getColor().toLowerCase().contains(query) ||
-                                    p.getType().toLowerCase().contains(query))
+                                    || p.getName().toLowerCase().contains(query)
+                                    || p.getBrand().toLowerCase().contains(query)
+                                    || p.getColor().toLowerCase().contains(query)
+                                    || p.getType().toLowerCase().contains(query))
                     .toList();
 
             view.refreshInventory(filtered);

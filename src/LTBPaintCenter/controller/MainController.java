@@ -25,6 +25,10 @@ public class MainController {
         Global.report = report;
 
         seedData();
+        List<Product> dbProducts = ProductDAO.getAllProducts();
+        for (Product p : dbProducts) {
+            inventory.addProduct(p);
+        }
         initializeControllers();
         initializeFrame();
 

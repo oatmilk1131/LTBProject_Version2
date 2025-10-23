@@ -21,12 +21,15 @@ public class Inventory {
         return map.values();
     }
 
-
     public void updateQuantity(int id, int delta) {
         Product p = map.get(id);
         if (p != null) {
             p.setQuantity(Math.max(0, p.getQuantity() + delta));
         }
+    }
+
+    public void clear() {
+        map.clear();
     }
 
 }
