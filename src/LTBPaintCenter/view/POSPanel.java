@@ -176,12 +176,12 @@ public class POSPanel extends JPanel {
             }
             boolean ok = checkoutHandler.handleCheckout(getCartSnapshot());
             if (ok) {
-                JOptionPane.showMessageDialog(this, "Sale recorded!");
+                //JOptionPane.showMessageDialog(this, "Sale recorded!");
                 clearCart();
             }
         });
 
-        // Di gumagana
+        // Di gumagana xd
         cartTable.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) editSelectedCartQty();

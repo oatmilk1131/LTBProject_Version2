@@ -13,12 +13,10 @@ public class SaleItem {
         this.qty = Math.max(qty, 0);
     }
 
-    /** Add to the existing quantity (never below zero). */
     public void addQuantity(int additional) {
         this.qty = Math.max(0, this.qty + additional);
     }
 
-    /** Get the subtotal for this sale item (price × quantity). */
     public double getSubtotal() {
         // Round to 2 decimal places for display consistency
         return Math.round(price * qty * 100.0) / 100.0;
@@ -26,7 +24,6 @@ public class SaleItem {
 
     public int getProductId() { return productId; }
 
-    /** Returns a formatted display ID like "P001". */
     public String getDisplayId() {
         return String.format("P%03d", productId);
     }

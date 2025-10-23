@@ -1,8 +1,6 @@
 package LTBPaintCenter.controller;
 
-import LTBPaintCenter.model.Inventory;
-import LTBPaintCenter.model.Product;
-import LTBPaintCenter.model.ProductDAO;
+import LTBPaintCenter.model.*;
 import LTBPaintCenter.view.InventoryPanel;
 
 import javax.swing.*;
@@ -13,46 +11,77 @@ import java.util.Objects;
 
 
     //InventoryController, handles all inventory management logic: add, update, delete, and table refresh.
-public class InventoryController {
-    private final Inventory inventory;
-    private final InventoryPanel view;
+    public class InventoryController {
+        private final Inventory inventory;
+        private final InventoryPanel view;
 
-    public InventoryController(Inventory inventory) {
-        this.inventory = inventory;
-        this.view = new InventoryPanel();
-        attachListeners();
-        refreshInventory();
-    }
+        public InventoryController(Inventory inventory) {
+            this.inventory = inventory;
+            this.view = new InventoryPanel();
+            attachListeners();
+            refreshInventory();
+
+            SwingUtilities.invokeLater(this::populateCombosFromDB);
+        }
 
         private void attachListeners() {
             view.getBtnAddUpdate().addActionListener(e -> addOrUpdate());
             view.getBtnDelete().addActionListener(e -> delete());
             view.getBtnClear().addActionListener(e -> clearForm());
 
-            //Search field + Find button
             view.getTfSearch().addActionListener(e -> performSearch());
             view.getBtnSearch().addActionListener(e -> performSearch());
 
             view.getTable().addMouseListener(new MouseAdapter() {
                 @Override
-                public void mouseClicked(MouseEvent e) {
-                    int r = view.getTable().getSelectedRow();
-                    if (r >= 0) {
-                        view.getTfId().setText(view.getTable().getValueAt(r, 0).toString());
-                        view.getTfName().setText(view.getTable().getValueAt(r, 1).toString());
-                        view.getTfPrice().setText(view.getTable().getValueAt(r, 5).toString());
-                        view.getTfQty().setText(view.getTable().getValueAt(r, 6).toString());
+                    public void mouseClicked(MouseEvent e) {
+                        int r = view.getTable().getSelectedRow();
+                        if (r >= 0) {
+                            view.getTfId().setText(view.getTable().getValueAt(r, 0).toString());
+                            view.getTfName().setText(view.getTable().getValueAt(r, 1).toString());
+                            view.getTfPrice().setText(view.getTable().getValueAt(r, 5).toString());
+                            view.getTfQty().setText(view.getTable().getValueAt(r, 6).toString());
+                        }
                     }
-                }
-            });
+                });
+        }
+
+        private void populateCombosFromDB() {
+            try {
+                var brands = ProductDAO.getDistinct("brand");
+                var colors = ProductDAO.getDistinct("color");
+                var types = ProductDAO.getDistinct("type");
+                // debug System.out.printf("Loaded combo values from DB: %d brands, %d colors, %d types.%n",
+                //    brands.size(), colors.size(), types.size())
+
+                view.populateCombos(brands, colors, types);
+                view.revalidate();
+                view.repaint();
+            } catch (Exception e) {
+                System.err.println("Failed to populate combos: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
 
         private void addOrUpdate() {
+            if (view.getTfId().getText().trim().startsWith("P")) {
+                view.getTfId().setText("");
+            }
+
             String idText = view.getTfId().getText().trim();
             String name = view.getTfName().getText().trim();
-            String brand = Objects.requireNonNull(view.getCbBrand().getSelectedItem()).toString();
-            String color = Objects.requireNonNull(view.getCbColor().getSelectedItem()).toString();
-            String type = Objects.requireNonNull(view.getCbType().getSelectedItem()).toString();
+
+            String brand = view.getCbBrand().isEditable()
+                    ? view.getCbBrand().getEditor().getItem().toString().trim()
+                    : Objects.requireNonNull(view.getCbBrand().getSelectedItem()).toString();
+
+            String color = view.getCbColor().isEditable()
+                    ? view.getCbColor().getEditor().getItem().toString().trim()
+                    : Objects.requireNonNull(view.getCbColor().getSelectedItem()).toString();
+
+            String type = view.getCbType().isEditable()
+                    ? view.getCbType().getEditor().getItem().toString().trim()
+                    : Objects.requireNonNull(view.getCbType().getSelectedItem()).toString();
 
             double price;
             int qty;
@@ -73,15 +102,20 @@ public class InventoryController {
                 @Override
                 protected Void doInBackground() {
                     try {
+                        LookupDAO.addIfNotExists("brands", brand);
+                        LookupDAO.addIfNotExists("colors", color);
+                        LookupDAO.addIfNotExists("types", type);
+
+                        Product newOrUpdatedProduct;
                         if (parsedId == null) {
-                            // add new
                             Product newProduct = new Product(0, name, price, qty, brand, color, type);
                             int newId = ProductDAO.addProduct(newProduct);
                             newProduct.setId(newId);
+                            newOrUpdatedProduct = newProduct;
                         } else {
-                            // update existing
                             Product updated = new Product(parsedId, name, price, qty, brand, color, type);
                             ProductDAO.updateProduct(updated);
+                            newOrUpdatedProduct = updated;
                         }
                     } catch (Exception e) {
                         this.thrown = e;
@@ -97,25 +131,24 @@ public class InventoryController {
                         return;
                     }
 
-                    inventory.clear();
-                    List<Product> updatedList = ProductDAO.getAllProducts();
-                    for (Product p : updatedList) {
-                        inventory.addProduct(p);
-                    }
+                    try { Thread.sleep(150); } catch (InterruptedException ignored) {}
 
-                    // ✅ Step 2: refresh the table view using updated DB data
+                    List<Product> updatedList = ProductDAO.getAllProducts();
+                    inventory.clear();
+                    for (Product p : updatedList) inventory.addProduct(p);
+
                     view.refreshInventory(updatedList);
 
-                    // ✅ Step 3: show correct ID in form
-                    if (parsedId == null) {
-                        Product last = updatedList.get(updatedList.size() - 1);
-                        view.getTfId().setText(String.format("P%03d", last.getId()));
-                    } else {
-                        view.getTfId().setText(String.format("P%03d", parsedId));
-                    }
+                    view.populateCombos(
+                            ProductDAO.getDistinct("brand"),
+                            ProductDAO.getDistinct("color"),
+                            ProductDAO.getDistinct("type")
+                    );
 
-                    clearFields();
-                    JOptionPane.showMessageDialog(view, "Product saved!");
+                    view.getTable().revalidate();
+                    view.getTable().repaint();
+                    view.getTfId().setText("");
+                    JOptionPane.showMessageDialog(view, "Product saved successfully!");
                 }
             }.execute();
         }
@@ -123,13 +156,11 @@ public class InventoryController {
         private void performSearch() {
             String query = view.getTfSearch().getText().trim().toLowerCase();
 
-            // If search box is empty, show all products from DB
             if (query.isEmpty()) {
                 refreshInventory();
                 return;
             }
 
-            // ✅ Fetch products directly from SQLite
             List<Product> allProducts = ProductDAO.getAllProducts();
 
             var filtered = allProducts.stream()
@@ -145,30 +176,56 @@ public class InventoryController {
         }
 
         private void delete() {
-        String id = view.getTfId().getText().trim();
-        if (id.isEmpty()) {
-            JOptionPane.showMessageDialog(view, "Select a product first");
-            return;
+            String idText = view.getTfId().getText().trim();
+            if (idText.isEmpty()) {
+                JOptionPane.showMessageDialog(view, "Select a product first");
+                return;
+            }
+
+            Integer parsedId = parseIdText(idText);
+            if (parsedId == null) {
+                JOptionPane.showMessageDialog(view, "Invalid product ID format.");
+                return;
+            }
+
+            Product target = inventory.getProduct(parsedId);
+            if (target == null) {
+                JOptionPane.showMessageDialog(view, "Product not found");
+                return;
+            }
+
+            int confirm = JOptionPane.showConfirmDialog(view, "Delete this product?", "Confirm", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                try {
+                    ProductDAO.deleteProduct(parsedId);
+
+                    inventory.removeProduct(parsedId);
+
+                    refreshInventory();
+                    JOptionPane.showMessageDialog(view, "Product deleted successfully.");
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(view, "Failed to delete product: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
         }
 
-        if (inventory.getProduct(Integer.parseInt(id)) == null) {
-            JOptionPane.showMessageDialog(view, "Product not found");
-            return;
+        public void refreshInventory() {
+            List<Product> all = ProductDAO.getAllProducts();
+            view.refreshInventory(all);
+
+            SwingUtilities.invokeLater(() -> {
+                view.populateCombos(
+                        ProductDAO.getDistinct("brand"),
+                        ProductDAO.getDistinct("color"),
+                        ProductDAO.getDistinct("type")
+                );
+                view.revalidate();
+                view.repaint();
+            });
         }
 
-        int confirm = JOptionPane.showConfirmDialog(view, "Delete this product?", "Confirm", JOptionPane.YES_NO_OPTION);
-        if (confirm == JOptionPane.YES_OPTION) {
-            inventory.removeProduct(Integer.parseInt(id));
-            refreshInventory();
-            JOptionPane.showMessageDialog(view, "Deleted.");
-        }
-    }
-
-    public void refreshInventory() {
-        view.refreshInventory(ProductDAO.getAllProducts());
-    }
-
-    public InventoryPanel getView() {
+        public InventoryPanel getView() {
         return view;
     }
 
@@ -181,11 +238,21 @@ public class InventoryController {
             view.getTable().clearSelection();
     }
         private Integer parseIdText(String idText) {
-            if (idText == null || idText.isBlank()) return null;
-            String digits = idText.replaceAll("\\D+", "");
-            if (digits.isEmpty()) return null;
+            if (idText == null) return null;
+            idText = idText.trim();
+
+            if (idText.isEmpty() || idText.equalsIgnoreCase("new")) return null;
+
+            if (idText.toUpperCase().startsWith("P")) {
+                idText = idText.substring(1);
+            }
+
             try {
-                return Integer.parseInt(digits);
+                int val = Integer.parseInt(idText);
+                if (ProductDAO.getById(val) == null) {
+                    return null;
+                }
+                return val;
             } catch (NumberFormatException e) {
                 return null;
             }

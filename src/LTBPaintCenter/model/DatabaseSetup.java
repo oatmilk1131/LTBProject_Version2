@@ -5,10 +5,6 @@ import java.sql.Statement;
 
 public class DatabaseSetup {
 
-    /**
-     * Call this at app startup to ensure table exists.
-     * If you changed schema during dev, delete ltbpaintcenter.db or set resetDatabase=true.
-     */
     public static void initialize() {
         // DEV: set to true to force delete and recreate DB (do not enable in production)
         boolean resetDatabase = false;
@@ -34,10 +30,35 @@ public class DatabaseSetup {
                 );
                 """;
 
+            String sqlBrands = """
+            CREATE TABLE IF NOT EXISTS brands (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL
+                );
+                """;
+
+            String sqlColors = """
+            CREATE TABLE IF NOT EXISTS colors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL
+                );
+                """;
+
+            String sqlTypes = """
+            CREATE TABLE IF NOT EXISTS types (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL
+                );
+                """;
+
+            stmt.execute(sqlBrands);
+            stmt.execute(sqlColors);
+            stmt.execute(sqlTypes);
+
             stmt.execute(sql);
-            System.out.println("✅ Product table ready.");
+            System.out.println("Product table ready.");
         } catch (Exception e) {
-            System.err.println("❌ Table setup failed: " + e.getMessage());
+            System.err.println("Table setup failed: " + e.getMessage());
             e.printStackTrace();
         }
     }

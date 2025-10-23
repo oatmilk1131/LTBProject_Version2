@@ -42,6 +42,8 @@ public class MonitoringPanel extends JPanel {
     private final JComboBox<String> cbChartMode = new JComboBox<>(new String[]{"Brand Revenue", "Type Revenue"});
     private final BarChartPanel barChartPanel = new BarChartPanel();
 
+    private List<Sale> currentSales;
+
     public MonitoringPanel() {
         setLayout(new BorderLayout(8, 8));
         setBackground(Color.WHITE);
@@ -125,6 +127,18 @@ public class MonitoringPanel extends JPanel {
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(BorderFactory.createTitledBorder("Recorded Sales"));
         add(scroll, BorderLayout.CENTER);
+
+        // 🟢 Add click listener for details
+        table.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                int row = table.getSelectedRow();
+                if (row >= 0 && currentSales != null && row < currentSales.size()) {
+                    Sale sale = currentSales.get(row);
+                    showSaleDetailsDialog(sale);
+                }
+            }
+        });
     }
 
     // SUMMARY SECTION
@@ -142,8 +156,11 @@ public class MonitoringPanel extends JPanel {
         topSummary.add(lblRevenue);
         summaryContainer.add(topSummary);
 
-        setupSummaryTextArea(taBrandSummary, "Revenue by Brand");
-        setupSummaryTextArea(taTypeSummary, "Revenue by Type");
+        JPanel summaries = new JPanel(new GridLayout(1, 2, 8, 8));
+        summaries.setBackground(Color.WHITE);
+        setupSummaryTextArea(taBrandSummary, "Revenue by Brand", summaries);
+        setupSummaryTextArea(taTypeSummary, "Revenue by Type", summaries);
+        summaryContainer.add(summaries);
 
         JPanel chartHeader = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 4));
         chartHeader.setBackground(Color.WHITE);
@@ -159,14 +176,14 @@ public class MonitoringPanel extends JPanel {
         add(summaryContainer, BorderLayout.SOUTH);
     }
 
-    private void setupSummaryTextArea(JTextArea area, String title) {
+    private void setupSummaryTextArea(JTextArea area, String title, JPanel parent) {
         area.setEditable(false);
         area.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         area.setBackground(new Color(248, 248, 248));
         area.setBorder(BorderFactory.createTitledBorder(title));
         area.setLineWrap(true);
         area.setWrapStyleWord(true);
-        add(area);
+        parent.add(area);
     }
 
     // PUBLIC
@@ -176,7 +193,9 @@ public class MonitoringPanel extends JPanel {
         int totalSales = 0;
         SimpleDateFormat fmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
-        for (Sale s : sales) {
+        currentSales = sales instanceof List ? (List<Sale>) sales : List.copyOf(sales);
+
+        for (Sale s : currentSales) {
             totalSales++;
             totalRevenue += s.getTotal();
 
@@ -196,6 +215,30 @@ public class MonitoringPanel extends JPanel {
 
         lblTotalSales.setText("Total Sales: " + totalSales);
         lblRevenue.setText(String.format("Total Revenue: ₱%.2f", totalRevenue));
+    }
+
+    private void showSaleDetailsDialog(Sale sale) {
+        String[] columns = {"Product", "Qty", "Price (₱)", "Subtotal (₱)"};
+        DefaultTableModel detailsModel = new DefaultTableModel(columns, 0);
+        for (SaleItem it : sale.getItems()) {
+            detailsModel.addRow(new Object[]{
+                    it.getName(),
+                    it.getQty(),
+                    String.format("%.2f", it.getPrice()),
+                    String.format("%.2f", it.getSubtotal())
+            });
+        }
+
+        JTable detailsTable = new JTable(detailsModel);
+        detailsTable.setRowHeight(24);
+        JScrollPane scroll = new JScrollPane(detailsTable);
+
+        JOptionPane.showMessageDialog(
+                this,
+                scroll,
+                "Sale " + sale.getId() + " — Total: ₱" + String.format("%.2f", sale.getTotal()),
+                JOptionPane.INFORMATION_MESSAGE
+        );
     }
 
     public void populateBrandFilter(Collection<String> brands) {
@@ -219,12 +262,6 @@ public class MonitoringPanel extends JPanel {
     public String getToDay()     { return (String) cbToDay.getSelectedItem(); }
     public String getToMonth()   { return (String) cbToMonth.getSelectedItem(); }
     public String getToYear()    { return (String) cbToYear.getSelectedItem(); }
-    public JComboBox<String> getCbFromDay()   { return cbFromDay; }
-    public JComboBox<String> getCbFromMonth() { return cbFromMonth; }
-    public JComboBox<String> getCbFromYear()  { return cbFromYear; }
-    public JComboBox<String> getCbToDay()     { return cbToDay; }
-    public JComboBox<String> getCbToMonth()   { return cbToMonth; }
-    public JComboBox<String> getCbToYear()    { return cbToYear; }
     public BarChartPanel getBarChartPanel()   { return barChartPanel; }
     public JComboBox<String> getCbChartMode() { return cbChartMode; }
 }
