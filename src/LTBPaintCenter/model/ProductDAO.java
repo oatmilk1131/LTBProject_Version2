@@ -8,20 +8,25 @@ public class ProductDAO {
 
     public static void addProduct(Product product) {
         String sql = "INSERT INTO products (name, price, quantity, brand, color, type) VALUES (?, ?, ?, ?, ?, ?)";
+
         try (Connection conn = Database.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            //pstmt.setString(1, product.getId());
+
             pstmt.setString(1, product.getName());
             pstmt.setDouble(2, product.getPrice());
             pstmt.setInt(3, product.getQuantity());
             pstmt.setString(4, product.getBrand());
             pstmt.setString(5, product.getColor());
             pstmt.setString(6, product.getType());
+
             pstmt.executeUpdate();
+            System.out.println("✅ Added: " + product.getName());
+
         } catch (SQLException e) {
             System.err.println("❌ Add product failed: " + e.getMessage());
         }
     }
+
 
     //String id, String name, double price, int quantity, String brand, String color, String type
 
@@ -60,19 +65,25 @@ public class ProductDAO {
     }
 
     public static void updateProduct(Product product) {
-        String sql = "UPDATE products SET name=?, category=?, price=?, quantity=? WHERE id=?";
+        String sql = "UPDATE products SET name=?, price=?, quantity=?, brand=?, color=?, type=? WHERE id=?";
+
         try (Connection conn = Database.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setString(1, product.getId());
-            pstmt.setString(2, product.getName());
-            pstmt.setDouble(3, product.getPrice());
-            pstmt.setInt(4, product.getQuantity());
-            pstmt.setString(5, product.getBrand());
-            pstmt.setString(6, product.getColor());
-            pstmt.setString(7, product.getType());
+
+            pstmt.setString(1, product.getName());
+            pstmt.setDouble(2, product.getPrice());
+            pstmt.setInt(3, product.getQuantity());
+            pstmt.setString(4, product.getBrand());
+            pstmt.setString(5, product.getColor());
+            pstmt.setString(6, product.getType());
+            pstmt.setString(7, product.getId());
+
             pstmt.executeUpdate();
+            System.out.println("✅ Updated: " + product.getName());
+
         } catch (SQLException e) {
             System.err.println("❌ Update failed: " + e.getMessage());
         }
     }
+
 }

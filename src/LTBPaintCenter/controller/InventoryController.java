@@ -47,38 +47,51 @@ public class InventoryController {
         }
 
         private void addOrUpdate() {
-        String id = view.getTfId().getText().trim();
-        String name = view.getTfName().getText().trim();
-        String brand = Objects.requireNonNull(view.getCbBrand().getSelectedItem()).toString();
-        String color = Objects.requireNonNull(view.getCbColor().getSelectedItem()).toString();
-        String type = Objects.requireNonNull(view.getCbType().getSelectedItem()).toString();
+            String idText = view.getTfId().getText().trim();
+            String name = view.getTfName().getText().trim();
+            String brand = Objects.requireNonNull(view.getCbBrand().getSelectedItem()).toString();
+            String color = Objects.requireNonNull(view.getCbColor().getSelectedItem()).toString();
+            String type = Objects.requireNonNull(view.getCbType().getSelectedItem()).toString();
 
-        double price;
-        int qty;
+            double price;
+            int qty;
 
-        try {
-            price = Double.parseDouble(view.getTfPrice().getText().trim());
-            qty = Integer.parseInt(view.getTfQty().getText().trim());
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(view, "Invalid price/quantity");
-            return;
+            try {
+                price = Double.parseDouble(view.getTfPrice().getText().trim());
+                qty = Integer.parseInt(view.getTfQty().getText().trim());
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(view, "Invalid price or quantity value.");
+                return;
+            }
+
+            try {
+                if (idText.isEmpty()) {
+                    // --- ADD NEW PRODUCT ---
+                    Product newProduct = new Product("0", name, price, qty, brand, color, type);
+                    ProductDAO.addProduct(newProduct);
+
+                    JOptionPane.showMessageDialog(view, "✅ New product added successfully!");
+                } else {
+                    // --- UPDATE EXISTING PRODUCT ---
+                    int id = Integer.parseInt(idText);
+                    Product updated = new Product(idText, name, price, qty, brand, color, type);
+                    ProductDAO.updateProduct(updated);
+
+                    JOptionPane.showMessageDialog(view, "✅ Product updated successfully!");
+                }
+
+                // --- REFRESH TABLE AFTER OPERATION ---
+                view.refreshInventory(ProductDAO.getAllProducts());
+
+                // --- Clear input fields if desired ---
+                //clearFields();
+
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(view, "❌ Database error: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
 
-        Product existing = inventory.getProduct(id);
-        if (existing == null) {
-            inventory.addProduct(new Product(id, name, price, qty, brand, color, type));
-        } else {
-            existing.setName(name);
-            existing.setPrice(price);
-            existing.setQuantity(qty);
-            existing.setBrand(brand);
-            existing.setColor(color);
-            existing.setType(type);
-        }
-
-        refreshInventory();
-        JOptionPane.showMessageDialog(view, "Product saved!");
-    }
 
         private void performSearch() {
             String query = view.getTfSearch().getText().trim().toLowerCase();
