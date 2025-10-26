@@ -44,6 +44,22 @@ public class MainFrame extends JFrame {
         add(sidebar, BorderLayout.WEST);
         add(mainPanel, BorderLayout.CENTER);
 
+        // Status bar with system date/time (lower left)
+        JPanel statusBar = new JPanel(new BorderLayout());
+        statusBar.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(210,210,210)));
+        statusBar.setBackground(Color.WHITE);
+        JLabel lblDateTime = new JLabel();
+        lblDateTime.setBorder(BorderFactory.createEmptyBorder(4,8,4,8));
+        statusBar.add(lblDateTime, BorderLayout.WEST);
+        add(statusBar, BorderLayout.SOUTH);
+
+        javax.swing.Timer timer = new javax.swing.Timer(1000, e -> {
+            String now = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date());
+            lblDateTime.setText("System Date/Time: " + now);
+        });
+        timer.setRepeats(true);
+        timer.start();
+
         addPanel(posController.getView(), "POS");
         addPanel(inventoryController.getView(), "Inventory");
         addPanel(monitoringController.getView(), "Monitoring");

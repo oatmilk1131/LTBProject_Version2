@@ -2,6 +2,7 @@ package LTBPaintCenter.controller;
 
 import LTBPaintCenter.model.*;
 import LTBPaintCenter.view.MonitoringPanel;
+import LTBPaintCenter.model.Global;
 
 import javax.swing.*;
 import java.text.SimpleDateFormat;
@@ -51,6 +52,19 @@ public class MonitoringController {
             updateBreakdownSummaries(allSales);
 
             populateBrandFilter();
+
+            // Update alerts with latest inventory batches
+            if (inventory != null) {
+                java.util.List<InventoryBatch> batches = new java.util.ArrayList<>();
+                for (ProductBatch pb : inventory.getAllBatches()) {
+                    InventoryBatch ib = new InventoryBatch(
+                            pb.getId(), pb.getName(), pb.getBrand(), pb.getColor(), pb.getType(),
+                            pb.getPrice(), pb.getQuantity(), pb.getDateImported(), pb.getExpirationDate(), pb.getStatus()
+                    );
+                    batches.add(ib);
+                }
+                view.updateAlerts(batches);
+            }
         }
 
         private void populateBrandFilter() {
@@ -165,13 +179,10 @@ public class MonitoringController {
         for (Sale s : sales) {
             for (SaleItem it : s.getItems()) {
                 Product p = inventory.getProduct(it.getProductId());
-                if (p != null) {
-                    String brand = p.getBrand() == null ? "Unknown" : p.getBrand();
-                    String type = p.getType() == null ? "Unknown" : p.getType();
-
-                    brandTotals.put(brand, brandTotals.getOrDefault(brand, 0.0) + it.getSubtotal());
-                    typeTotals.put(type, typeTotals.getOrDefault(type, 0.0) + it.getSubtotal());
-                }
+                String brand = (p != null && p.getBrand() != null && !p.getBrand().isBlank()) ? p.getBrand() : "Unknown";
+                String type = (p != null && p.getType() != null && !p.getType().isBlank()) ? p.getType() : "Unknown";
+                brandTotals.put(brand, brandTotals.getOrDefault(brand, 0.0) + it.getSubtotal());
+                typeTotals.put(type, typeTotals.getOrDefault(type, 0.0) + it.getSubtotal());
             }
         }
 

@@ -13,6 +13,12 @@ public class Sale {
         this.date = new Date();
     }
 
+    // Overloaded constructor for reconstructing from database with known date/time
+    public Sale(String saleId, Date date) {
+        this.saleId = saleId;
+        this.date = (date != null) ? date : new Date();
+    }
+
     public void addItem(SaleItem it) { items.add(it); total += it.getSubtotal(); }
     public String getId() { return saleId; }
     public Date getDate() { return date; }

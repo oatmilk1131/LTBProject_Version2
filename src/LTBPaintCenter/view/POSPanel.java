@@ -1,15 +1,19 @@
 package LTBPaintCenter.view;
 
 import LTBPaintCenter.model.Product;
+import LTBPaintCenter.model.ProductBatch;
 import LTBPaintCenter.model.SaleItem;
+import LTBPaintCenter.model.AlertManager;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.List;
+
 
 public class POSPanel extends JPanel {
     private final JPanel productGrid = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 12));
@@ -21,27 +25,35 @@ public class POSPanel extends JPanel {
         @Override public boolean isCellEditable(int row, int column) { return false; }
     };
     private final JTable cartTable = new JTable(cartTableModel);
-    private final JLabel lblTotal = new JLabel("Total: ₱0.00");
+    private final JLabel lblSubtotalLabel = new JLabel("Subtotal: ₱0.00");
+    private final JLabel lblVatable = new JLabel("VATable: ₱0.00");
+    private final JLabel lblVatExempt = new JLabel("Non-VAT: ₱0.00");
+    private final JLabel lblVAT = new JLabel("VAT (12%): ₱0.00");
+    private final JLabel lblTotal = new JLabel("TOTAL: ₱0.00");
 
     // Cart buttons
     private final JButton btnCheckout = new JButton("Checkout");
     private final JButton btnClear = new JButton("Clear Cart");
     private final JButton btnRemove = new JButton("Remove Selected");
 
-    // Internal cart state
-    private Map<Integer, SaleItem> cart = new HashMap<>();
-    private Map<Integer, Product> productMap = new HashMap<>();
-
+    // Internal state
+    private final Map<Integer, SaleItem> cart = new HashMap<>();
+    private final Map<Integer, ProductBatch> batchMap = new HashMap<>();
 
     // Filters
     private final JComboBox<String> cbBrand = new JComboBox<>();
     private final JComboBox<String> cbColor = new JComboBox<>();
     private final JComboBox<String> cbType = new JComboBox<>();
+    private final JTextField txtSearch = new JTextField(16);
+    private final JComboBox<String> cbSort = new JComboBox<>(new String[]{"Name A–Z", "Price Low–High", "Price High–Low"});
     private boolean suppressFilterEvents = false;
 
     // Checkout handler
     public interface CheckoutHandler { boolean handleCheckout(List<SaleItem> cartSnapshot); }
     private CheckoutHandler checkoutHandler = null;
+
+    // Expiration awareness
+    private final AlertManager alertManager = new AlertManager();
 
     public POSPanel() {
         setLayout(new BorderLayout(10, 10));
@@ -52,15 +64,17 @@ public class POSPanel extends JPanel {
         initProductArea();
         initCartArea();
 
+        // Ensure totals react to any table changes as an extra safety net
+        cartTableModel.addTableModelListener(e -> updateTotal());
+
         // Wire filter listeners
-        cbBrand.addActionListener(e -> { if (!suppressFilterEvents) updateProductGrid(productMap.values()); });
-        cbColor.addActionListener(e -> { if (!suppressFilterEvents) updateProductGrid(productMap.values()); });
-        cbType.addActionListener(e -> { if (!suppressFilterEvents) updateProductGrid(productMap.values()); });
+        cbBrand.addActionListener(e -> { if (!suppressFilterEvents) updateProductGrid(batchMap.values()); });
+        cbColor.addActionListener(e -> { if (!suppressFilterEvents) updateProductGrid(batchMap.values()); });
+        cbType.addActionListener(e -> { if (!suppressFilterEvents) updateProductGrid(batchMap.values()); });
     }
 
-    // Init
     private void initFilterBar() {
-        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
+        JPanel filterPanel = new JPanel(new GridBagLayout());
         filterPanel.setBackground(Color.WHITE);
         filterPanel.setBorder(BorderFactory.createTitledBorder("Filters"));
 
@@ -68,14 +82,58 @@ public class POSPanel extends JPanel {
         cbColor.addItem("All Colors");
         cbType.addItem("All Types");
 
-        filterPanel.add(new JLabel("Brand:"));
-        filterPanel.add(cbBrand);
-        filterPanel.add(Box.createHorizontalStrut(8));
-        filterPanel.add(new JLabel("Color:"));
-        filterPanel.add(cbColor);
-        filterPanel.add(Box.createHorizontalStrut(8));
-        filterPanel.add(new JLabel("Type:"));
-        filterPanel.add(cbType);
+        GridBagConstraints gc = new GridBagConstraints();
+        gc.insets = new Insets(4, 6, 4, 6);
+        gc.gridy = 0;
+        gc.gridx = 0;
+        gc.anchor = GridBagConstraints.WEST;
+
+        // Row 0
+        filterPanel.add(new JLabel("Search:"), gc);
+        gc.gridx++;
+        gc.fill = GridBagConstraints.HORIZONTAL;
+        gc.weightx = 1.0;
+        txtSearch.setToolTipText("Search by name, brand, color, or type");
+        filterPanel.add(txtSearch, gc);
+
+        gc.gridx++;
+        gc.fill = GridBagConstraints.NONE;
+        gc.weightx = 0;
+        filterPanel.add(new JLabel("Brand:"), gc);
+        gc.gridx++;
+        filterPanel.add(cbBrand, gc);
+
+        gc.gridx++;
+        filterPanel.add(new JLabel("Color:"), gc);
+        gc.gridx++;
+        filterPanel.add(cbColor, gc);
+
+        // Row 1
+        gc.gridy = 1;
+        gc.gridx = 0;
+        filterPanel.add(new JLabel("Type:"), gc);
+        gc.gridx++;
+        filterPanel.add(cbType, gc);
+
+        gc.gridx++;
+        filterPanel.add(new JLabel("Sort:"), gc);
+        gc.gridx++;
+        filterPanel.add(cbSort, gc);
+
+        // filler to push left and allow expansion
+        gc.gridx++;
+        gc.weightx = 1.0;
+        gc.fill = GridBagConstraints.HORIZONTAL;
+        filterPanel.add(Box.createHorizontalGlue(), gc);
+
+        // Live search
+        txtSearch.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            private void refilter() { updateProductGrid(batchMap.values()); }
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { refilter(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { refilter(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { refilter(); }
+        });
+        cbSort.addActionListener(e -> updateProductGrid(batchMap.values()));
 
         add(filterPanel, BorderLayout.NORTH);
     }
@@ -105,21 +163,17 @@ public class POSPanel extends JPanel {
     }
 
     private void layoutGridToFitWidth() {
-        // Determine width available for cards
         int availableWidth = productScroll.getViewport().getWidth();
-        int cardWidth = 150 + 12; // 150px card + 12px gap
+        int cardWidth = 150 + 12;
         int columns = Math.max(1, availableWidth / cardWidth);
-
         if (columns > 4) columns = 4;
 
-        // Update layout dynamically
-        int rows = (int) Math.ceil((double) productMap.size() / columns);
+        int rows = (int) Math.ceil((double) batchMap.size() / columns);
         GridLayout layout = new GridLayout(rows, columns, 12, 12);
         productGrid.setLayout(layout);
         productGrid.revalidate();
         productGrid.repaint();
     }
-
 
     private void initCartArea() {
         JPanel rightPanel = new JPanel(new BorderLayout(8, 8));
@@ -132,15 +186,25 @@ public class POSPanel extends JPanel {
         JPanel top = new JPanel(new BorderLayout());
         top.setBackground(Color.WHITE);
         top.add(lblCart, BorderLayout.WEST);
-        top.add(lblTotal, BorderLayout.EAST);
         lblTotal.setFont(new Font("Segoe UI", Font.BOLD, 13));
+
+        JPanel totalsPanel = new JPanel();
+        totalsPanel.setBackground(Color.WHITE);
+        totalsPanel.setLayout(new BoxLayout(totalsPanel, BoxLayout.Y_AXIS));
+        lblSubtotalLabel.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        lblVAT.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        lblTotal.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        totalsPanel.add(lblSubtotalLabel);
+        totalsPanel.add(lblVAT);
+        totalsPanel.add(lblTotal);
+        top.add(totalsPanel, BorderLayout.EAST);
 
         JScrollPane scroll = new JScrollPane(cartTable);
         scroll.setBorder(BorderFactory.createLineBorder(new Color(220, 220, 220)));
         cartTable.setRowHeight(26);
         cartTable.getTableHeader().setReorderingAllowed(false);
 
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
+        JPanel buttons = new JPanel(new GridLayout(1, 3, 8, 0));
         buttons.setBackground(Color.WHITE);
         buttons.add(btnRemove);
         buttons.add(btnClear);
@@ -156,7 +220,6 @@ public class POSPanel extends JPanel {
 
         add(rightPanel, BorderLayout.EAST);
 
-        // Cart button actions
         btnClear.addActionListener(e -> {
             if (!cart.isEmpty()) {
                 int confirm = JOptionPane.showConfirmDialog(this, "Clear entire cart?", "Confirm", JOptionPane.YES_NO_OPTION);
@@ -175,13 +238,9 @@ public class POSPanel extends JPanel {
                 return;
             }
             boolean ok = checkoutHandler.handleCheckout(getCartSnapshot());
-            if (ok) {
-                //JOptionPane.showMessageDialog(this, "Sale recorded!");
-                clearCart();
-            }
+            if (ok) clearCart();
         });
 
-        // Di gumagana xd
         cartTable.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) editSelectedCartQty();
@@ -193,21 +252,25 @@ public class POSPanel extends JPanel {
     public List<SaleItem> getCartSnapshot() { return new ArrayList<>(cart.values()); }
     public void clearCart() { cart.clear(); refreshCartTable(); }
 
-    public void refreshProducts(Collection<Product> products) {
-        if (products == null) products = Collections.emptyList();
+    /**
+     * Refreshes product grid from batches.
+     */
+    public void refreshProducts(Collection<ProductBatch> batches) {
+        if (batches == null) batches = Collections.emptyList();
 
-        productMap.clear();
-        for (Product p : products) productMap.put(p.getId(), p);
+        batchMap.clear();
+        for (ProductBatch b : batches) {
+            batchMap.put(b.getId(), b);
+        }
 
         Set<String> brands = new TreeSet<>();
         Set<String> colors = new TreeSet<>();
         Set<String> types = new TreeSet<>();
-        for (Product p : products) {
-            if (p.getBrand() != null && !p.getBrand().isBlank()) brands.add(p.getBrand());
-            if (p.getColor() != null && !p.getColor().isBlank()) colors.add(p.getColor());
-            if (p.getType()  != null && !p.getType().isBlank())  types.add(p.getType());
+        for (ProductBatch b : batches) {
+            if (b.getBrand() != null && !b.getBrand().isBlank()) brands.add(b.getBrand());
+            if (b.getColor() != null && !b.getColor().isBlank()) colors.add(b.getColor());
+            if (b.getType() != null && !b.getType().isBlank())  types.add(b.getType());
         }
-
 
         suppressFilterEvents = true;
         try {
@@ -223,89 +286,61 @@ public class POSPanel extends JPanel {
             suppressFilterEvents = false;
         }
 
-        // Update grid
-        updateProductGrid(productMap.values());
+        updateProductGrid(batchMap.values());
         layoutGridToFitWidth();
     }
 
-    // Update product grid using filter selections
-    private void updateProductGrid(Collection<Product> products) {
+    private void updateProductGrid(Collection<ProductBatch> batches) {
         productGrid.removeAll();
 
-        String selectedBrand = cbBrand.getSelectedItem() != null ? cbBrand.getSelectedItem().toString() : "All Brands";
-        String selectedColor = cbColor.getSelectedItem() != null ? cbColor.getSelectedItem().toString() : "All Colors";
-        String selectedType  = cbType.getSelectedItem() != null ? cbType.getSelectedItem().toString() : "All Types";
+        String selectedBrand = Objects.toString(cbBrand.getSelectedItem(), "All Brands");
+        String selectedColor = Objects.toString(cbColor.getSelectedItem(), "All Colors");
+        String selectedType  = Objects.toString(cbType.getSelectedItem(), "All Types");
+        String q = txtSearch.getText() != null ? txtSearch.getText().trim().toLowerCase() : "";
 
-        for (Product p : products) {
-            boolean brandOk = selectedBrand.equals("All Brands") || selectedBrand.equals(p.getBrand());
-            boolean colorOk = selectedColor.equals("All Colors") || selectedColor.equals(p.getColor());
-            boolean typeOk  = selectedType.equals("All Types")  || selectedType.equals(p.getType());
+        java.util.List<ProductBatch> list = new ArrayList<>();
+        for (ProductBatch b : batches) {
+            if (b.isExpired()) continue; // Hide expired items
 
-            if (brandOk && colorOk && typeOk) {
-                productGrid.add(createProductCard(p));
-            }
+            boolean brandOk = selectedBrand.equals("All Brands") || selectedBrand.equals(b.getBrand());
+            boolean colorOk = selectedColor.equals("All Colors") || selectedColor.equals(b.getColor());
+            boolean typeOk  = selectedType.equals("All Types")  || selectedType.equals(b.getType());
+
+            boolean textOk = q.isEmpty() ||
+                    (b.getName() != null && b.getName().toLowerCase().contains(q)) ||
+                    (b.getBrand() != null && b.getBrand().toLowerCase().contains(q)) ||
+                    (b.getColor() != null && b.getColor().toLowerCase().contains(q)) ||
+                    (b.getType() != null && b.getType().toLowerCase().contains(q));
+
+            if (brandOk && colorOk && typeOk && textOk) list.add(b);
         }
+
+        String sortOpt = Objects.toString(cbSort.getSelectedItem(), "Name A–Z");
+        switch (sortOpt) {
+            case "Price Low–High" -> list.sort(Comparator.comparingDouble(ProductBatch::getPrice));
+            case "Price High–Low" -> list.sort(Comparator.comparingDouble(ProductBatch::getPrice).reversed());
+            default -> list.sort(Comparator.comparing(ProductBatch::getName, String.CASE_INSENSITIVE_ORDER));
+        }
+
+        for (ProductBatch b : list) productGrid.add(createProductCard(b));
 
         productGrid.revalidate();
         productGrid.repaint();
     }
 
-    // Product card & quantity dialog
-    private ImageIcon loadIconResource(String resourcePath, int w, int h) {
-        try {
-            // Try resource as stream (works inside IDE and inside jar)
-            var is = getClass().getResourceAsStream(resourcePath);
-            if (is != null) {
-                var img = javax.imageio.ImageIO.read(is);
-                if (img != null) {
-                    var scaled = img.getScaledInstance(w, h, Image.SCALE_SMOOTH);
-                    return new ImageIcon(scaled);
-                }
-            } else {
-                // debug: resource not found
-                // javax.swing.JOptionPane.showMessageDialog(this, "Resource not found: " + resourcePath);
-            }
-        } catch (Exception ex) {
-            // ignore and fallback
-        }
-        return null;
-    }
-
-    private JPanel createProductCard(Product p) {
+    private JPanel createProductCard(ProductBatch b) {
         JPanel card = new JPanel(new BorderLayout());
         card.setPreferredSize(new Dimension(150, 150));
         card.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200)));
         card.setBackground(Color.WHITE);
 
-        // Filename image
-        String imageName = switch (p.getId()) {
-            /*case "P001" -> "boysen_red.png";
-            case "P002" -> "boysen_white.png";
-            case "P003" -> "boysen_green.png";
-            case "P004" -> "davies_blue.png";
-            case "P005" -> "davies_yellow.png";
-            case "P006" -> "nation_black.png";
-            case "P007" -> "nation_gray.png";*/
-            default -> null;
-        };
-
-        ImageIcon icon = null;
-        if (imageName != null) {
-            icon = loadIconResource("/LTBPaintCenter/assets/" + imageName, 100, 100);
-        }
-
-        JLabel imgLabel;
-        if (icon != null) {
-            imgLabel = new JLabel(icon, SwingConstants.CENTER);
-        } else {
-            imgLabel = new JLabel("🖌️", SwingConstants.CENTER);
-            imgLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 36));
-        }
+        JLabel imgLabel = new JLabel("🖌️", SwingConstants.CENTER);
+        imgLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 36));
         card.add(imgLabel, BorderLayout.CENTER);
 
-        JLabel lblName = new JLabel("<html><center>" + p.getName() + "</center></html>", SwingConstants.CENTER);
+        JLabel lblName = new JLabel("<html><center>" + b.getName() + "</center></html>", SwingConstants.CENTER);
         lblName.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        JLabel lblPrice = new JLabel(String.format("₱%.2f", p.getPrice()), SwingConstants.CENTER);
+        JLabel lblPrice = new JLabel(String.format("₱%.2f", b.getPrice()), SwingConstants.CENTER);
         lblPrice.setFont(new Font("Segoe UI", Font.BOLD, 12));
 
         JPanel bottom = new JPanel(new GridLayout(2, 1));
@@ -314,9 +349,18 @@ public class POSPanel extends JPanel {
         bottom.add(lblPrice);
         card.add(bottom, BorderLayout.SOUTH);
 
+        // Add warnings
+        if (b.isExpiringSoon() || b.getQuantity() <= 5) {
+            JLabel warn = new JLabel("⚠️", SwingConstants.RIGHT);
+            warn.setToolTipText(b.isExpiringSoon()
+                    ? "Expiring soon!"
+                    : "Low stock: " + b.getQuantity());
+            card.add(warn, BorderLayout.NORTH);
+        }
+
         card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         card.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mouseClicked(java.awt.event.MouseEvent e) { openQuantityDialogAndAdd(p); }
+            @Override public void mouseClicked(MouseEvent e) { openQuantityDialogAndAdd(b); }
             @Override public void mouseEntered(java.awt.event.MouseEvent e) { card.setBackground(new Color(245, 245, 245)); }
             @Override public void mouseExited(java.awt.event.MouseEvent e) { card.setBackground(Color.WHITE); }
         });
@@ -324,25 +368,29 @@ public class POSPanel extends JPanel {
         return card;
     }
 
-    private void openQuantityDialogAndAdd(Product p) {
-        int stock = p.getQuantity();
-        int alreadyInCart = cart.containsKey(p.getId()) ? cart.get(p.getId()).getQty() : 0;
+    private void openQuantityDialogAndAdd(ProductBatch b) {
+        if (b.isExpired()) {
+            JOptionPane.showMessageDialog(this, "This batch is expired and cannot be sold.");
+            return;
+        }
+
+        int stock = b.getQuantity();
+        int alreadyInCart = cart.containsKey(b.getId()) ? cart.get(b.getId()).getQty() : 0;
         int available = stock - alreadyInCart;
         if (available <= 0) {
             JOptionPane.showMessageDialog(this, "Out of stock!");
             return;
         }
 
-        QuantityDialog qd = new QuantityDialog(p.getName(), available);
+        QuantityDialog qd = new QuantityDialog(b.getName(), available);
         Integer qty = qd.showDialog();
-        if (qty != null && qty > 0) addToCart(p, qty);
+        if (qty != null && qty > 0) addToCart(b, qty);
     }
 
-    // Cart operations
-    private void addToCart(Product p, int qty) {
-        SaleItem existing = cart.get(p.getId());
+    private void addToCart(ProductBatch b, int qty) {
+        SaleItem existing = cart.get(b.getId());
         if (existing != null) existing.addQuantity(qty);
-        else cart.put(p.getId(), new SaleItem(p.getId(), p.getName(), p.getPrice(), qty));
+        else cart.put(b.getId(), new SaleItem(b.getId(), b.getName(), b.getPrice(), qty));
         refreshCartTable();
     }
 
@@ -363,66 +411,64 @@ public class POSPanel extends JPanel {
     private void removeSelectedCartItem() {
         int row = cartTable.getSelectedRow();
         if (row < 0) return;
-        String idStr = cartTableModel.getValueAt(row, 0).toString();
-        int id = Integer.parseInt(idStr.replaceAll("\\D+", ""));
+        int id = Integer.parseInt(cartTableModel.getValueAt(row, 0).toString());
         cart.remove(id);
         refreshCartTable();
     }
 
-
     private void editSelectedCartQty() {
         int selectedRow = cartTable.getSelectedRow();
         if (selectedRow < 0) return;
+        int id = Integer.parseInt(cartTableModel.getValueAt(selectedRow, 0).toString());
 
-        // Read the displayed ID from the table and extract numeric part (handles "P001" or "1")
-        Object cellValue = cartTableModel.getValueAt(selectedRow, 0);
-        if (cellValue == null) return;
-
-        String idStr = cellValue.toString().trim();
-        int id;
-        try {
-            id = Integer.parseInt(idStr.replaceAll("\\D+", "")); // strip non-digits safely
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "Invalid product ID: " + idStr);
-            return;
-        }
-
-        // Get SaleItem and Product by numeric ID
         SaleItem item = cart.get(id);
         if (item == null) return;
 
-        Product product = productMap.get(id);
-        int max = (product != null) ? product.getQuantity() : item.getQty();
+        ProductBatch batch = batchMap.get(id);
+        int available = (batch != null) ? batch.getQuantity() : item.getQty();
 
-        // Calculate available stock excluding this item's current qty
-        int cartQtyOther = cart.values().stream()
-                .filter(i -> i != item)
-                .mapToInt(SaleItem::getQty)
-                .sum();
-        int available = Math.max(max - cartQtyOther, item.getQty());
-
-        // Open quantity dialog
         QuantityDialog qd = new QuantityDialog(item.getName(), available);
         Integer newQty = qd.showDialog();
 
         if (newQty != null) {
-            if (newQty <= 0) {
-                cart.remove(id);
-            } else {
-                item.setQty(newQty);
-            }
+            if (newQty <= 0) cart.remove(id);
+            else item.setQty(newQty);
             refreshCartTable();
         }
     }
 
-
-
     private void updateTotal() {
-        double total = cart.values().stream().mapToDouble(SaleItem::getSubtotal).sum();
-        lblTotal.setText(String.format("Total: ₱%.2f", total));
+        // Ensure UI updates happen on the EDT for consistent repaint behavior
+        Runnable r = () -> {
+            // Use BigDecimal for accurate currency math and rounding
+            java.math.BigDecimal vatable = cart.values().stream()
+                    .map(it -> java.math.BigDecimal.valueOf(it.getSubtotal()))
+                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+            java.math.BigDecimal nonVat = java.math.BigDecimal.ZERO; // all items VATable by default in current business rules
+            java.math.BigDecimal subtotal = vatable.add(nonVat);
+            java.math.BigDecimal vat = vatable.multiply(java.math.BigDecimal.valueOf(0.12))
+                    .setScale(2, java.math.RoundingMode.HALF_UP);
+            java.math.BigDecimal total = subtotal.add(vat).setScale(2, java.math.RoundingMode.HALF_UP);
+
+            // Update labels
+            lblSubtotalLabel.setText(String.format("Subtotal: ₱%.2f", subtotal.doubleValue()));
+            lblVAT.setText(String.format("VAT (12%): ₱%.2f", vat.doubleValue()));
+            lblTotal.setText(String.format("TOTAL: ₱%.2f", total.doubleValue()));
+
+            // Ensure the UI reflects changes immediately
+            java.awt.Container totalsParent = lblTotal.getParent();
+            if (totalsParent != null) {
+                totalsParent.revalidate();
+                totalsParent.repaint();
+            }
+            POSPanel.this.revalidate();
+            POSPanel.this.repaint();
+        };
+        if (javax.swing.SwingUtilities.isEventDispatchThread()) r.run();
+        else javax.swing.SwingUtilities.invokeLater(r);
     }
 
-    // Dialog box
+    // Quantity dialog reused from before
     private static class QuantityDialog extends JDialog {
         private Integer result = null;
         private final JTextField txtQty;
@@ -462,7 +508,6 @@ public class POSPanel extends JPanel {
             add(bottom, BorderLayout.SOUTH);
 
             btnCancel.addActionListener(e -> { result = null; dispose(); });
-
             btnAdd.addActionListener(e -> {
                 try {
                     int val = Integer.parseInt(txtQty.getText().trim());

@@ -1,271 +1,131 @@
 package LTBPaintCenter.controller;
 
-import LTBPaintCenter.model.*;
-import LTBPaintCenter.view.InventoryPanel;
+import LTBPaintCenter.dao.InventoryDAO;
+import LTBPaintCenter.model.Database;
+import LTBPaintCenter.model.InventoryBatch;
 
-import javax.swing.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.List;
-import java.util.Objects;
 
+/**
+ * Controller layer between InventoryDAO and the UI panels.
+ * Handles logic for adding, updating, deleting, and filtering inventory items.
+ */
+public class InventoryController {
 
-    //InventoryController, handles all inventory management logic: add, update, delete, and table refresh.
-    public class InventoryController {
-        private final Inventory inventory;
-        private final InventoryPanel view;
+    private final InventoryDAO inventoryDAO;
+    private final LTBPaintCenter.view.InventoryPanel view;
 
-        public InventoryController(Inventory inventory) {
-            this.inventory = inventory;
-            this.view = new InventoryPanel();
-            attachListeners();
-            refreshInventory();
-
-            SwingUtilities.invokeLater(this::populateCombosFromDB);
+    public InventoryController() {
+        Connection conn = null;
+        try {
+            conn = Database.getConnection();
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
+        inventoryDAO = new InventoryDAO(conn);
+        this.view = new LTBPaintCenter.view.InventoryPanel(this);
+    }
 
-        private void attachListeners() {
-            view.getBtnAddUpdate().addActionListener(e -> addOrUpdate());
-            view.getBtnDelete().addActionListener(e -> delete());
-            view.getBtnClear().addActionListener(e -> clearForm());
+    // ───────────────────────────────
+    // CRUD operations
+    // ───────────────────────────────
 
-            view.getTfSearch().addActionListener(e -> performSearch());
-            view.getBtnSearch().addActionListener(e -> performSearch());
+    public boolean addBatch(String productCode, String name, String brand, String color, String type, double price, int qty,
+                            LocalDate dateImported, LocalDate expirationDate) {
 
-            view.getTable().addMouseListener(new MouseAdapter() {
-                @Override
-                    public void mouseClicked(MouseEvent e) {
-                        int r = view.getTable().getSelectedRow();
-                        if (r >= 0) {
-                            view.getTfId().setText(view.getTable().getValueAt(r, 0).toString());
-                            view.getTfName().setText(view.getTable().getValueAt(r, 1).toString());
-                            view.getTfPrice().setText(view.getTable().getValueAt(r, 5).toString());
-                            view.getTfQty().setText(view.getTable().getValueAt(r, 6).toString());
-                        }
-                    }
-                });
-        }
+        String status = determineStatus(expirationDate, qty);
+        InventoryBatch batch = new InventoryBatch(0, productCode, name, brand, color, type, price, qty, dateImported, expirationDate, status);
+        return inventoryDAO.addBatch(batch);
+    }
 
-        private void populateCombosFromDB() {
-            try {
-                var brands = ProductDAO.getDistinct("brand");
-                var colors = ProductDAO.getDistinct("color");
-                var types = ProductDAO.getDistinct("type");
-                // debug System.out.printf("Loaded combo values from DB: %d brands, %d colors, %d types.%n",
-                //    brands.size(), colors.size(), types.size())
+    public List<InventoryBatch> getAllBatches() {
+        inventoryDAO.refreshStatuses();
+        return inventoryDAO.getAllBatches();
+    }
 
-                view.populateCombos(brands, colors, types);
-                view.revalidate();
-                view.repaint();
-            } catch (Exception e) {
-                System.err.println("Failed to populate combos: " + e.getMessage());
-                e.printStackTrace();
+    public boolean updateBatch(InventoryBatch batch) {
+        batch.setStatus(determineStatus(batch.getExpirationDate(), batch.getQuantity()));
+        return inventoryDAO.updateBatch(batch);
+    }
+
+    public boolean deleteBatch(int id) {
+        return inventoryDAO.deleteBatch(id);
+    }
+
+    // ───────────────────────────────
+    // POS filtering
+    // ───────────────────────────────
+    public List<InventoryBatch> getAvailableForPOS() {
+        inventoryDAO.refreshStatuses();
+        List<InventoryBatch> all = inventoryDAO.getAllBatches();
+        return all.stream()
+                .filter(b -> !"Expired".equalsIgnoreCase(b.getStatus()))
+                .filter(b -> b.getQuantity() > 0)
+                .toList();
+    }
+
+    // ───────────────────────────────
+    // Helper: determine status
+    // ───────────────────────────────
+    private String determineStatus(LocalDate expirationDate, int qty) {
+        LocalDate today = LocalDate.now();
+        if (expirationDate != null) {
+            if (!expirationDate.isAfter(today)) {
+                return "Expired"; // expiration <= today
+            } else if (expirationDate.isBefore(today.plusDays(7))) {
+                return "Expiring Soon"; // within next 7 days
             }
         }
-
-        private void addOrUpdate() {
-            if (view.getTfId().getText().trim().startsWith("P")) {
-                view.getTfId().setText("");
-            }
-
-            String idText = view.getTfId().getText().trim();
-            String name = view.getTfName().getText().trim();
-
-            String brand = view.getCbBrand().isEditable()
-                    ? view.getCbBrand().getEditor().getItem().toString().trim()
-                    : Objects.requireNonNull(view.getCbBrand().getSelectedItem()).toString();
-
-            String color = view.getCbColor().isEditable()
-                    ? view.getCbColor().getEditor().getItem().toString().trim()
-                    : Objects.requireNonNull(view.getCbColor().getSelectedItem()).toString();
-
-            String type = view.getCbType().isEditable()
-                    ? view.getCbType().getEditor().getItem().toString().trim()
-                    : Objects.requireNonNull(view.getCbType().getSelectedItem()).toString();
-
-            double price;
-            int qty;
-
-            try {
-                price = Double.parseDouble(view.getTfPrice().getText().trim());
-                qty = Integer.parseInt(view.getTfQty().getText().trim());
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(view, "Invalid price or quantity.");
-                return;
-            }
-
-            Integer parsedId = parseIdText(idText);
-
-            new javax.swing.SwingWorker<Void, Void>() {
-                private Exception thrown;
-
-                @Override
-                protected Void doInBackground() {
-                    try {
-                        LookupDAO.addIfNotExists("brands", brand);
-                        LookupDAO.addIfNotExists("colors", color);
-                        LookupDAO.addIfNotExists("types", type);
-
-                        Product newOrUpdatedProduct;
-                        if (parsedId == null) {
-                            Product newProduct = new Product(0, name, price, qty, brand, color, type);
-                            int newId = ProductDAO.addProduct(newProduct);
-                            newProduct.setId(newId);
-                            newOrUpdatedProduct = newProduct;
-                        } else {
-                            Product updated = new Product(parsedId, name, price, qty, brand, color, type);
-                            ProductDAO.updateProduct(updated);
-                            newOrUpdatedProduct = updated;
-                        }
-                    } catch (Exception e) {
-                        this.thrown = e;
-                    }
-                    return null;
-                }
-
-                @Override
-                protected void done() {
-                    if (thrown != null) {
-                        JOptionPane.showMessageDialog(view, "Database error: " + thrown.getMessage());
-                        thrown.printStackTrace();
-                        return;
-                    }
-
-                    try { Thread.sleep(150); } catch (InterruptedException ignored) {}
-
-                    List<Product> updatedList = ProductDAO.getAllProducts();
-                    inventory.clear();
-                    for (Product p : updatedList) inventory.addProduct(p);
-
-                    view.refreshInventory(updatedList);
-
-                    view.populateCombos(
-                            ProductDAO.getDistinct("brand"),
-                            ProductDAO.getDistinct("color"),
-                            ProductDAO.getDistinct("type")
-                    );
-
-                    view.getTable().revalidate();
-                    view.getTable().repaint();
-                    view.getTfId().setText("");
-                    JOptionPane.showMessageDialog(view, "Product saved successfully!");
-                }
-            }.execute();
+        if (qty <= 0) {
+            return "Out of Stock";
+        } else if (qty <= 5) {
+            return "Low Stock";
+        } else {
+            return "Active";
         }
+    }
 
-        private void performSearch() {
-            String query = view.getTfSearch().getText().trim().toLowerCase();
+    // ───────────────────────────────
+    // Log updates for MonitoringPanel
+    // ───────────────────────────────
+    public String generateStatusLogs() {
+        StringBuilder logs = new StringBuilder();
+        List<InventoryBatch> batches = getAllBatches();
+        LocalDate today = LocalDate.now();
 
-            if (query.isEmpty()) {
-                refreshInventory();
-                return;
-            }
-
-            List<Product> allProducts = ProductDAO.getAllProducts();
-
-            var filtered = allProducts.stream()
-                    .filter(p ->
-                            String.valueOf(p.getId()).contains(query)
-                                    || p.getName().toLowerCase().contains(query)
-                                    || p.getBrand().toLowerCase().contains(query)
-                                    || p.getColor().toLowerCase().contains(query)
-                                    || p.getType().toLowerCase().contains(query))
-                    .toList();
-
-            view.refreshInventory(filtered);
-        }
-
-        private void delete() {
-            String idText = view.getTfId().getText().trim();
-            if (idText.isEmpty()) {
-                JOptionPane.showMessageDialog(view, "Select a product first");
-                return;
-            }
-
-            Integer parsedId = parseIdText(idText);
-            if (parsedId == null) {
-                JOptionPane.showMessageDialog(view, "Invalid product ID format.");
-                return;
-            }
-
-            Product target = inventory.getProduct(parsedId);
-            if (target == null) {
-                JOptionPane.showMessageDialog(view, "Product not found");
-                return;
-            }
-
-            int confirm = JOptionPane.showConfirmDialog(view, "Delete this product?", "Confirm", JOptionPane.YES_NO_OPTION);
-            if (confirm == JOptionPane.YES_OPTION) {
-                try {
-                    ProductDAO.deleteProduct(parsedId);
-
-                    inventory.removeProduct(parsedId);
-
-                    refreshInventory();
-                    JOptionPane.showMessageDialog(view, "Product deleted successfully.");
-                } catch (Exception e) {
-                    JOptionPane.showMessageDialog(view, "Failed to delete product: " + e.getMessage());
-                    e.printStackTrace();
-                }
+        for (InventoryBatch b : batches) {
+            if ("Expired".equalsIgnoreCase(b.getStatus())) {
+                logs.append(String.format("[%s] %s (%s) expired on %s%n",
+                        today, b.getName(), b.getBrand(), b.getExpirationDate()));
+            } else if ("Expiring Soon".equalsIgnoreCase(b.getStatus())) {
+                long daysLeft = b.getExpirationDate().toEpochDay() - today.toEpochDay();
+                logs.append(String.format("[%s] %s (%s) expiring in %d days (%s)%n",
+                        today, b.getName(), b.getBrand(), daysLeft, b.getExpirationDate()));
+            } else if ("Low Stock".equalsIgnoreCase(b.getStatus())) {
+                logs.append(String.format("[%s] %s (%s) low on stock — %d left%n",
+                        today, b.getName(), b.getBrand(), b.getQuantity()));
+            } else if ("Out of Stock".equalsIgnoreCase(b.getStatus())) {
+                logs.append(String.format("[%s] %s (%s) is out of stock%n",
+                        today, b.getName(), b.getBrand()));
             }
         }
 
-        public void refreshInventory() {
-            List<Product> all = ProductDAO.getAllProducts();
-            view.refreshInventory(all);
+        return logs.toString();
+    }
 
-            SwingUtilities.invokeLater(() -> {
-                view.populateCombos(
-                        ProductDAO.getDistinct("brand"),
-                        ProductDAO.getDistinct("color"),
-                        ProductDAO.getDistinct("type")
-                );
-                view.revalidate();
-                view.repaint();
-            });
-        }
-
-        public InventoryPanel getView() {
+    // ───────────────────────────────
+    // View accessors for MainFrame/MainController
+    // ───────────────────────────────
+    public javax.swing.JPanel getView() {
         return view;
     }
 
-    private void clearForm() {
-            view.getTfId().setText("");
-            view.getTfName().setText("");
-            view.getTfPrice().setText("");
-            view.getTfQty().setText("");
-            view.getTfSearch().setText("");
-            view.getTable().clearSelection();
-    }
-        private Integer parseIdText(String idText) {
-            if (idText == null) return null;
-            idText = idText.trim();
-
-            if (idText.isEmpty() || idText.equalsIgnoreCase("new")) return null;
-
-            if (idText.toUpperCase().startsWith("P")) {
-                idText = idText.substring(1);
-            }
-
-            try {
-                int val = Integer.parseInt(idText);
-                if (ProductDAO.getById(val) == null) {
-                    return null;
-                }
-                return val;
-            } catch (NumberFormatException e) {
-                return null;
-            }
+    public void refreshInventory() {
+        if (view != null) {
+            view.refreshTable();
         }
-
-        private void clearFields() {
-            view.getTfId().setText("");
-            view.getTfName().setText("");
-            view.getTfPrice().setText("");
-            view.getTfQty().setText("");
-            view.getCbBrand().setSelectedIndex(0);
-            view.getCbColor().setSelectedIndex(0);
-            view.getCbType().setSelectedIndex(0);
-        }
-
     }
+}

@@ -1,262 +1,482 @@
 package LTBPaintCenter.view;
 
-import LTBPaintCenter.model.Product;
+import LTBPaintCenter.controller.InventoryController;
+import LTBPaintCenter.model.InventoryBatch;
+import LTBPaintCenter.model.Global;
+
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.util.Collection;
-import java.util.TreeSet;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
-/**
- * Inventory panel for managing products.
- * Provides product entry form, table view, and basic CRUD controls.
- */
 public class InventoryPanel extends JPanel {
-    private final JTextField tfId = new JTextField(8);
-    private final JTextField tfName = new JTextField(12);
-    private final JTextField tfPrice = new JTextField(6);
-    private final JTextField tfQty = new JTextField(4);
+    private final InventoryController controller;
+    private final DefaultTableModel tableModel;
+    private final JTable table;
+
+    // user-typed product code
+    private final JTextField txtCode = new JTextField();
+    private final JTextField txtName = new JTextField();
     private final JComboBox<String> cbBrand = new JComboBox<>();
     private final JComboBox<String> cbColor = new JComboBox<>();
     private final JComboBox<String> cbType = new JComboBox<>();
-    private final JTextField tfSearch = new JTextField(10);
+    private final JTextField txtPrice = new JTextField();
+    private final JTextField txtQty = new JTextField();
+    private final JSpinner spDateImported = new JSpinner(new SpinnerDateModel(new java.util.Date(), null, null, java.util.Calendar.DAY_OF_MONTH));
+    private final JSpinner spExpiration = new JSpinner(new SpinnerDateModel());
+    private final JCheckBox chkNoExpiration = new JCheckBox("No Expiration");
 
-    private final JButton btnAddUpdate = new JButton("Add / Update");
+    // Filters & sorting
+    private final JTextField txtSearch = new JTextField();
+    private final JComboBox<String> cbFilterBrand = new JComboBox<>();
+    private final JComboBox<String> cbFilterColor = new JComboBox<>();
+    private final JComboBox<String> cbSort = new JComboBox<>(new String[]{"A–Z (Name)", "Price Low–High", "Price High–Low"});
+    private javax.swing.table.TableRowSorter<DefaultTableModel> rowSorter;
+
+    private final JButton btnAdd = new JButton("Add Batch");
+    private final JButton btnUpdate = new JButton("Update");
     private final JButton btnDelete = new JButton("Delete");
-    private final JButton btnClear = new JButton("Clear Fields");
-    private final JButton btnSearch = new JButton("Find");
+    private final JButton btnRefresh = new JButton("Refresh");
 
-    private final DefaultTableModel model = new DefaultTableModel(
-            new String[]{"ID", "Name", "Brand", "Color", "Type", "Price", "Qty"}, 0
-    ) {
-        @Override public boolean isCellEditable(int r, int c) { return false; }
-    };
-
-    private final JTable table = new JTable(model);
-
-    public InventoryPanel() {
-        setLayout(new BorderLayout(8, 8));
+    public InventoryPanel(InventoryController controller) {
+        this.controller = controller;
+        setLayout(new BorderLayout(10, 10));
         setBackground(Color.WHITE);
-        setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
-        initTopBar();
-        initTableArea();
-    }
+        // ─────────────────────────────
+        // Table setup
+        // ─────────────────────────────
+        String[] columns = {
+                "ID", "Product ID", "Name", "Brand", "Color", "Type", "Price", "Qty",
+                "Date Imported", "Expiration Date", "Status"
+        };
+        tableModel = new DefaultTableModel(columns, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+        table = new JTable(tableModel);
+        table.setRowHeight(25);
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 13));
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-    // FORM SECTION
-    private void initTopBar() {
-        JPanel topPanel = new JPanel(new BorderLayout(6, 6));
-        topPanel.setBackground(Color.WHITE);
-        topPanel.setBorder(BorderFactory.createTitledBorder("Product Details"));
+        // Hide numeric ID column from view while keeping it in the model for operations
+        table.removeColumn(table.getColumnModel().getColumn(0));
 
-        JPanel row1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        row1.setBackground(Color.WHITE);
-        row1.add(new JLabel("ID:"));   row1.add(tfId);
-        row1.add(new JLabel("Name:")); row1.add(tfName);
-        row1.add(new JLabel("Price:"));row1.add(tfPrice);
-        row1.add(new JLabel("Qty:"));  row1.add(tfQty);
+        add(new JScrollPane(table), BorderLayout.CENTER);
 
-        JPanel row2 = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        row2.setBackground(Color.WHITE);
-        addLabeledCombo(row2, "Brand:", cbBrand);
-        addLabeledCombo(row2, "Color:", cbColor);
-        addLabeledCombo(row2, "Type:", cbType);
+        // Populate form fields when selecting a row
+        table.getSelectionModel().addListSelectionListener(e -> {
+            if (e.getValueIsAdjusting()) return;
+            int viewRow = table.getSelectedRow();
+            if (viewRow < 0) return;
+            int row = table.convertRowIndexToModel(viewRow);
+            try {
+                txtCode.setText(String.valueOf(tableModel.getValueAt(row, 1)));
+                txtName.setText(String.valueOf(tableModel.getValueAt(row, 2)));
+                String brand = String.valueOf(tableModel.getValueAt(row, 3));
+                String color = String.valueOf(tableModel.getValueAt(row, 4));
+                String type = String.valueOf(tableModel.getValueAt(row, 5));
+                cbBrand.setSelectedItem(brand);
+                cbColor.setSelectedItem(color);
+                cbType.setSelectedItem(type);
+                txtPrice.setText(String.valueOf(tableModel.getValueAt(row, 6)));
+                txtQty.setText(String.valueOf(tableModel.getValueAt(row, 7)));
+
+                java.time.format.DateTimeFormatter df = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                String impStr = String.valueOf(tableModel.getValueAt(row, 8));
+                if (impStr != null && !impStr.isBlank()) {
+                    java.time.LocalDate ld = java.time.LocalDate.parse(impStr, df);
+                    java.util.Date d = java.util.Date.from(ld.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant());
+                    spDateImported.setValue(d);
+                }
+
+                String expStr = String.valueOf(tableModel.getValueAt(row, 9));
+                if (expStr != null && !expStr.isBlank()) {
+                    chkNoExpiration.setSelected(false);
+                    spExpiration.setEnabled(true);
+                    java.time.LocalDate ld = java.time.LocalDate.parse(expStr, df);
+                    java.util.Date d = java.util.Date.from(ld.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant());
+                    spExpiration.setValue(d);
+                } else {
+                    chkNoExpiration.setSelected(true);
+                    spExpiration.setEnabled(false);
+                }
+            } catch (Exception ignored) {}
+        });
+
+        // ─────────────────────────────
+        // Form panel
+        // ─────────────────────────────
+        JPanel formPanel = new JPanel(new GridLayout(3, 6, 8, 8));
+        formPanel.setBorder(BorderFactory.createTitledBorder("Product Batch Details"));
+        formPanel.setBackground(Color.WHITE);
+
         cbBrand.setEditable(true);
         cbColor.setEditable(true);
         cbType.setEditable(true);
+        ((JSpinner.DefaultEditor) spDateImported.getEditor()).getTextField().setEditable(false);
+        spDateImported.setEditor(new JSpinner.DateEditor(spDateImported, "yyyy-MM-dd"));
+        spExpiration.setEditor(new JSpinner.DateEditor(spExpiration, "yyyy-MM-dd"));
 
-        JPanel formSection = new JPanel(new GridLayout(2, 1));
-        formSection.setBackground(Color.WHITE);
-        formSection.add(row1);
-        formSection.add(row2);
-        topPanel.add(formSection, BorderLayout.CENTER);
+        // Row 1: Product ID, Name, Brand
+        formPanel.add(new JLabel("Product ID:"));
+        formPanel.add(txtCode);
+        formPanel.add(new JLabel("Name:"));
+        formPanel.add(txtName);
+        formPanel.add(new JLabel("Brand:"));
+        formPanel.add(cbBrand);
 
+        // Row 2: Color, Type, Price
+        formPanel.add(new JLabel("Color:"));
+        formPanel.add(cbColor);
+        formPanel.add(new JLabel("Type:"));
+        formPanel.add(cbType);
+        formPanel.add(new JLabel("Price:"));
+        formPanel.add(txtPrice);
+
+        // Row 3: Quantity, Date Imported, Expiration
+        formPanel.add(new JLabel("Quantity:"));
+        formPanel.add(txtQty);
+        formPanel.add(new JLabel("Date Imported:"));
+        formPanel.add(spDateImported);
+        formPanel.add(new JLabel("Expiration Date:"));
+        JPanel expPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        expPanel.setBackground(Color.WHITE);
+        expPanel.add(spExpiration);
+        expPanel.add(chkNoExpiration);
+        formPanel.add(expPanel);
+
+        chkNoExpiration.addActionListener(e -> spExpiration.setEnabled(!chkNoExpiration.isSelected()));
+
+        // Top container: form + filter/sort bar
+        JPanel northContainer = new JPanel(new BorderLayout(8, 8));
+        northContainer.setBackground(Color.WHITE);
+        northContainer.add(formPanel, BorderLayout.NORTH);
+
+        JPanel filterBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        filterBar.setBackground(Color.WHITE);
+        filterBar.setBorder(BorderFactory.createTitledBorder("Search, Filter, and Sort"));
+
+        filterBar.add(new JLabel("Search:"));
+        txtSearch.setColumns(16);
+        filterBar.add(txtSearch);
+
+        filterBar.add(new JLabel("Brand:"));
+        cbFilterBrand.addItem("All Brands");
+        filterBar.add(cbFilterBrand);
+
+        filterBar.add(new JLabel("Color:"));
+        cbFilterColor.addItem("All Colors");
+        filterBar.add(cbFilterColor);
+
+        filterBar.add(new JLabel("Sort:"));
+        filterBar.add(cbSort);
+
+        northContainer.add(filterBar, BorderLayout.SOUTH);
+        add(northContainer, BorderLayout.NORTH);
+
+        // ─────────────────────────────
         // Buttons
-        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
-        btnPanel.setBackground(Color.WHITE);
-        styleButton(btnAddUpdate, new Color(0, 120, 215), Color.WHITE);
-        styleButton(btnDelete, new Color(220, 53, 69), Color.WHITE);
-        styleButton(btnClear, new Color(108, 117, 125), Color.WHITE);
-        btnPanel.add(btnAddUpdate);
-        btnPanel.add(btnDelete);
-        btnPanel.add(btnClear);
-        btnClear.addActionListener(e -> clearFormFields());
+        // ─────────────────────────────
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 5));
+        buttonPanel.add(btnAdd);
+        buttonPanel.add(btnUpdate);
+        buttonPanel.add(btnDelete);
+        buttonPanel.add(btnRefresh);
+        add(buttonPanel, BorderLayout.SOUTH);
 
-        topPanel.add(btnPanel, BorderLayout.EAST);
-        add(topPanel, BorderLayout.NORTH);
+        // ─────────────────────────────
+        // Button actions
+        // ─────────────────────────────
+        btnAdd.addActionListener(e -> handleAdd());
+        btnUpdate.addActionListener(e -> handleUpdate());
+        btnDelete.addActionListener(e -> handleDelete());
+        btnRefresh.addActionListener(e -> refreshTable());
+
+        // Initialize sorting/filtering and row highlighting
+        setupFilters();
+        refreshTable();
     }
 
-    private void addLabeledCombo(JPanel panel, String label, JComboBox<String> combo) {
-        panel.add(new JLabel(label));
-        combo.setPreferredSize(new Dimension(130, 25));
-        panel.add(combo);
+    // ─────────────────────────────
+    // Event handlers
+    // ─────────────────────────────
+    private void handleAdd() {
+        try {
+            String name = txtName.getText().trim();
+            String brand = (cbBrand.getEditor().getItem() != null) ? cbBrand.getEditor().getItem().toString().trim() : "";
+            String color = (cbColor.getEditor().getItem() != null) ? cbColor.getEditor().getItem().toString().trim() : "";
+            String type = (cbType.getEditor().getItem() != null) ? cbType.getEditor().getItem().toString().trim() : "";
+            double price = Double.parseDouble(txtPrice.getText().trim());
+            int qty = Integer.parseInt(txtQty.getText().trim());
+            java.util.Date impDate = (java.util.Date) spDateImported.getValue();
+            LocalDate imported = impDate.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+            LocalDate expiration = null;
+            if (!chkNoExpiration.isSelected()) {
+                java.util.Date expDate = (java.util.Date) spExpiration.getValue();
+                expiration = expDate == null ? null : expDate.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+            }
+
+            String code = txtCode.getText().trim();
+            boolean added = controller.addBatch(code, name, brand, color, type, price, qty, imported, expiration);
+            if (added) {
+                if (brand != null && !brand.isBlank()) cbBrand.addItem(brand);
+                if (color != null && !color.isBlank()) cbColor.addItem(color);
+                if (type != null && !type.isBlank()) cbType.addItem(type);
+                JOptionPane.showMessageDialog(this, "Batch added successfully!");
+                refreshTable();
+                // Notify other modules
+                if (Global.posController != null) Global.posController.refreshPOS();
+                if (Global.monitoringController != null) Global.monitoringController.refresh();
+            } else {
+                JOptionPane.showMessageDialog(this, "Failed to add batch.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Invalid input: " + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
-    private void styleButton(JButton b, Color bg, Color fg) {
-        b.setBackground(bg);
-        b.setForeground(fg);
-        b.setFocusPainted(false);
-        b.setFont(new Font("Segoe UI", Font.BOLD, 13));
-        b.setPreferredSize(new Dimension(120, 28));
+    private void handleUpdate() {
+        int viewRow = table.getSelectedRow();
+        if (viewRow == -1) {
+            JOptionPane.showMessageDialog(this, "Select a row to update.");
+            return;
+        }
+        int row = table.convertRowIndexToModel(viewRow);
+
+        try {
+            int id = Integer.parseInt(tableModel.getValueAt(row, 0).toString());
+
+            String name = txtName.getText().trim();
+            String brand = (cbBrand.getEditor().getItem() != null) ? cbBrand.getEditor().getItem().toString().trim() : "";
+            String color = (cbColor.getEditor().getItem() != null) ? cbColor.getEditor().getItem().toString().trim() : "";
+            String type = (cbType.getEditor().getItem() != null) ? cbType.getEditor().getItem().toString().trim() : "";
+
+            double price = Double.parseDouble(txtPrice.getText().trim());
+            int qty = Integer.parseInt(txtQty.getText().trim());
+
+            java.util.Date impDate = (java.util.Date) spDateImported.getValue();
+            LocalDate imported = impDate == null ? null : impDate.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+
+            LocalDate expiration = null;
+            if (!chkNoExpiration.isSelected()) {
+                java.util.Date expDate = (java.util.Date) spExpiration.getValue();
+                expiration = expDate == null ? null : expDate.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+            }
+
+            // status will be recomputed in controller.updateBatch
+            String productCode = txtCode.getText().trim();
+            InventoryBatch batch = new InventoryBatch(id, productCode, name, brand, color, type, price, qty, imported, expiration, "");
+            boolean updated = controller.updateBatch(batch);
+            if (updated) {
+                JOptionPane.showMessageDialog(this, "Batch updated!");
+                refreshTable();
+                if (Global.posController != null) Global.posController.refreshPOS();
+                if (Global.monitoringController != null) Global.monitoringController.refresh();
+            } else {
+                JOptionPane.showMessageDialog(this, "Update failed.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Update failed: " + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
-    // TABLE SECTION
-    private void initTableArea() {
-        JPanel midPanel = new JPanel(new BorderLayout(6, 6));
-        midPanel.setBackground(Color.WHITE);
-        midPanel.setBorder(BorderFactory.createTitledBorder("Inventory List"));
+    private void handleDelete() {
+        int viewRow = table.getSelectedRow();
+        if (viewRow == -1) {
+            JOptionPane.showMessageDialog(this, "Select a batch to delete.");
+            return;
+        }
+        int row = table.convertRowIndexToModel(viewRow);
 
-        // Search Bar
-        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        searchPanel.setBackground(Color.WHITE);
-        JLabel lblSearch = new JLabel("Search:");
-        styleButton(btnSearch, new Color(0, 120, 215), Color.WHITE);
-        searchPanel.add(lblSearch);
-        searchPanel.add(tfSearch);
-        searchPanel.add(btnSearch);
-        midPanel.add(searchPanel, BorderLayout.NORTH);
+        int id = Integer.parseInt(tableModel.getValueAt(row, 0).toString());
+        int confirm = JOptionPane.showConfirmDialog(this, "Are you sure?", "Confirm Delete",
+                JOptionPane.YES_NO_OPTION);
+        if (confirm == JOptionPane.YES_OPTION) {
+            controller.deleteBatch(id);
+            refreshTable();
+            if (Global.posController != null) Global.posController.refreshPOS();
+            if (Global.monitoringController != null) Global.monitoringController.refresh();
+        }
+    }
 
-        // Table Setup
-        table.setRowHeight(26);
-        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
-        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        table.setGridColor(new Color(230, 230, 230));
+    // ─────────────────────────────
+    // Refresh table
+    // ─────────────────────────────
+    public void refreshTable() {
+        tableModel.setRowCount(0);
+        List<InventoryBatch> batches = controller.getAllBatches();
+        DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
+        // Populate combos
+        java.util.Set<String> brands = new java.util.TreeSet<>();
+        java.util.Set<String> colors = new java.util.TreeSet<>();
+        java.util.Set<String> types = new java.util.TreeSet<>();
+
+        for (InventoryBatch b : batches) {
+            brands.add(b.getBrand() == null ? "" : b.getBrand());
+            colors.add(b.getColor() == null ? "" : b.getColor());
+            types.add(b.getType() == null ? "" : b.getType());
+
+            String status = computeDisplayStatus(b);
+            tableModel.addRow(new Object[]{
+                    b.getId(), b.getProductCode(), b.getName(), b.getBrand(), b.getColor(), b.getType(),
+                    String.format("%.2f", b.getPrice()), b.getQuantity(),
+                    b.getDateImported() != null ? b.getDateImported().format(df) : "",
+                    b.getExpirationDate() != null ? b.getExpirationDate().format(df) : "",
+                    status
+            });
+        }
+
+        // Update filter combos
+        cbFilterBrand.removeAllItems();
+        cbFilterBrand.addItem("All Brands");
+        for (String s : brands) if (s != null && !s.isBlank()) cbFilterBrand.addItem(s);
+
+        cbFilterColor.removeAllItems();
+        cbFilterColor.addItem("All Colors");
+        for (String s : colors) if (s != null && !s.isBlank()) cbFilterColor.addItem(s);
+
+        // Update form combos (keep existing items but ensure base set)
+        cbBrand.removeAllItems(); for (String s : brands) if (s != null && !s.isBlank()) cbBrand.addItem(s);
+        cbColor.removeAllItems(); for (String s : colors) if (s != null && !s.isBlank()) cbColor.addItem(s);
+        cbType.removeAllItems(); for (String s : types) if (s != null && !s.isBlank()) cbType.addItem(s);
+
+        // Re-apply filters if sorter exists
+        if (rowSorter != null) applyFilters();
+    }
+
+    private String computeDisplayStatus(InventoryBatch b) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        boolean expired = false;
+        boolean expSoon = false;
+
+        if (b.getExpirationDate() != null) {
+            java.time.LocalDate exp = b.getExpirationDate();
+            if (!exp.isAfter(today)) {
+                expired = true; // exp <= today → expired
+            } else if (!exp.isAfter(today.plusDays(7))) {
+                expSoon = true; // within next 7 days
+            }
+        }
+
+        boolean out = b.getQuantity() <= 0;
+        boolean low = !out && b.getQuantity() <= 5;
+
+        StringBuilder sb = new StringBuilder();
+        if (expired) sb.append("Expired");
+        else if (expSoon) sb.append("Expiring Soon");
+
+        if (out) {
+            if (sb.length() > 0) sb.append("; ");
+            sb.append("Out of Stock");
+        } else if (low) {
+            if (sb.length() > 0) sb.append("; ");
+            sb.append("Low Stock");
+        }
+
+        return sb.toString();
+    }
+
+    private void setupFilters() {
+        rowSorter = new javax.swing.table.TableRowSorter<>(tableModel);
+        table.setRowSorter(rowSorter);
+
+        // Numeric comparator for price (column 6 after adding Code column)
+        rowSorter.setComparator(6, (o1, o2) -> {
+            try {
+                double d1 = Double.parseDouble(o1.toString());
+                double d2 = Double.parseDouble(o2.toString());
+                return Double.compare(d1, d2);
+            } catch (Exception e) { return 0; }
+        });
+
+        // Search and filter listeners
+        javax.swing.event.DocumentListener dl = new javax.swing.event.DocumentListener() {
+            private void changed() { applyFilters(); }
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { changed(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { changed(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { changed(); }
+        };
+        txtSearch.getDocument().addDocumentListener(dl);
+        cbFilterBrand.addActionListener(e -> applyFilters());
+        cbFilterColor.addActionListener(e -> applyFilters());
+        cbSort.addActionListener(e -> applySort());
+
+        // Row renderer to highlight status when not selected; preserve selection highlight when selected
+        javax.swing.table.TableCellRenderer defaultRenderer = table.getDefaultRenderer(Object.class);
         table.setDefaultRenderer(Object.class, new javax.swing.table.DefaultTableCellRenderer() {
             @Override
-            public Component getTableCellRendererComponent(
-                    JTable table, Object value, boolean isSelected,
-                    boolean hasFocus, int row, int column) {
-                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                if (!isSelected) c.setBackground(row % 2 == 0 ? Color.WHITE : new Color(245, 245, 245));
+            public java.awt.Component getTableCellRendererComponent(JTable tbl, Object value, boolean isSelected, boolean hasFocus, int row, int col) {
+                java.awt.Component c = super.getTableCellRendererComponent(tbl, value, isSelected, hasFocus, row, col);
+                if (isSelected) {
+                    c.setBackground(tbl.getSelectionBackground());
+                    c.setForeground(tbl.getSelectionForeground());
+                    return c;
+                }
+                c.setForeground(Color.BLACK);
+                c.setBackground(Color.WHITE);
+                int modelRow = tbl.convertRowIndexToModel(row);
+                String status = String.valueOf(tableModel.getValueAt(modelRow, 10));
+                if (status != null && !status.isBlank()) {
+                    Color bg = new Color(255, 235, 205); // default: light peach
+                    if (status.toLowerCase().contains("expired")) bg = new Color(255, 205, 210); // light red
+                    else if (status.toLowerCase().contains("expiring")) bg = new Color(255, 224, 178); // light orange
+                    else if (status.toLowerCase().contains("low stock")) bg = new Color(255, 249, 196); // light yellow
+                    else if (status.toLowerCase().contains("out of stock")) bg = new Color(224, 224, 224); // light gray
+                    c.setBackground(bg);
+                }
                 return c;
             }
         });
 
-        JScrollPane scroll = new JScrollPane(table);
-        table.addMouseListener(new java.awt.event.MouseAdapter() {
+        applySort();
+        applyFilters();
+    }
+
+    private void applySort() {
+        String sort = (String) cbSort.getSelectedItem();
+        java.util.List<javax.swing.RowSorter.SortKey> keys = new java.util.ArrayList<>();
+        if ("A–Z (Name)".equals(sort)) {
+            keys.add(new javax.swing.RowSorter.SortKey(2, javax.swing.SortOrder.ASCENDING));
+        } else if ("Price Low–High".equals(sort)) {
+            keys.add(new javax.swing.RowSorter.SortKey(6, javax.swing.SortOrder.ASCENDING));
+        } else if ("Price High–Low".equals(sort)) {
+            keys.add(new javax.swing.RowSorter.SortKey(6, javax.swing.SortOrder.DESCENDING));
+        }
+        rowSorter.setSortKeys(keys);
+    }
+
+    private void applyFilters() {
+        String search = txtSearch.getText().trim().toLowerCase();
+        String brandSel = (String) cbFilterBrand.getSelectedItem();
+        String colorSel = (String) cbFilterColor.getSelectedItem();
+        boolean filterBrand = brandSel != null && !brandSel.equals("All Brands");
+        boolean filterColor = colorSel != null && !colorSel.equals("All Colors");
+
+        javax.swing.RowFilter<DefaultTableModel, Integer> rf = new javax.swing.RowFilter<>() {
             @Override
-            public void mouseClicked(java.awt.event.MouseEvent e) {
-                int row = table.getSelectedRow();
-                if (row >= 0) {
-                    int modelRow = table.convertRowIndexToModel(row);
-                    loadSelectedRow(modelRow);
-                }
+            public boolean include(Entry<? extends DefaultTableModel, ? extends Integer> entry) {
+                String code = String.valueOf(entry.getValue(1)).toLowerCase();
+                String name = String.valueOf(entry.getValue(2)).toLowerCase();
+                String brand = String.valueOf(entry.getValue(3));
+                String color = String.valueOf(entry.getValue(4));
+                String type = String.valueOf(entry.getValue(5)).toLowerCase();
+                boolean matchesSearch = search.isEmpty() || code.contains(search) || name.contains(search) || type.contains(search)
+                        || brand.toLowerCase().contains(search) || color.toLowerCase().contains(search);
+                boolean matchesBrand = !filterBrand || brand.equals(brandSel);
+                boolean matchesColor = !filterColor || color.equals(colorSel);
+                return matchesSearch && matchesBrand && matchesColor;
             }
-        });
-
-        midPanel.add(scroll, BorderLayout.CENTER);
-        add(midPanel, BorderLayout.CENTER);
+        };
+        rowSorter.setRowFilter(rf);
     }
-
-    // DATA OPERATIONS
-    public void refreshInventory(Collection<Product> products) {
-        model.setRowCount(0);
-        for (Product p : products) {
-            model.addRow(new Object[]{
-                    p.getDisplayId(),
-                    p.getName(),
-                    p.getBrand(),
-                    p.getColor(),
-                    p.getType(),
-                    String.format("%.2f", p.getPrice()),
-                    p.getQuantity()
-            });
-        }
-        updateCombos(products);
-    }
-
-
-    public static String formatProductId(String id) {
-        return "P"+id;
-    }
-
-    public void populateCombos(Collection<String> brands, Collection<String> colors, Collection<String> types) {
-        cbBrand.removeAllItems();
-        cbColor.removeAllItems();
-        cbType.removeAllItems();
-
-        cbBrand.addItem("Select Brand");
-        for (String b : brands) cbBrand.addItem(b);
-
-        cbColor.addItem("Select Color");
-        for (String c : colors) cbColor.addItem(c);
-
-        cbType.addItem("Select Type");
-        for (String t : types) cbType.addItem(t);
-    }
-
-    private void updateCombos(Collection<Product> products) {
-        cbBrand.removeAllItems();
-        cbColor.removeAllItems();
-        cbType.removeAllItems();
-
-        cbBrand.addItem("Select Brand");
-        cbColor.addItem("Select Color");
-        cbType.addItem("Select Type");
-
-        TreeSet<String> brands = new TreeSet<>();
-        TreeSet<String> colors = new TreeSet<>();
-        TreeSet<String> types = new TreeSet<>();
-
-        for (Product p : products) {
-            if (!p.getBrand().isBlank()) brands.add(p.getBrand());
-            if (!p.getColor().isBlank()) colors.add(p.getColor());
-            if (!p.getType().isBlank()) types.add(p.getType());
-        }
-
-        brands.forEach(cbBrand::addItem);
-        colors.forEach(cbColor::addItem);
-        types.forEach(cbType::addItem);
-    }
-
-    private void loadSelectedRow(int modelRow) {
-        tfId.setText(model.getValueAt(modelRow, 0).toString());
-        tfName.setText(model.getValueAt(modelRow, 1).toString());
-        tfPrice.setText(model.getValueAt(modelRow, 5).toString());
-        tfQty.setText(model.getValueAt(modelRow, 6).toString());
-
-        selectComboBoxValue(cbBrand, model.getValueAt(modelRow, 2).toString());
-        selectComboBoxValue(cbColor, model.getValueAt(modelRow, 3).toString());
-        selectComboBoxValue(cbType, model.getValueAt(modelRow, 4).toString());
-    }
-
-    private void clearFormFields() {
-        tfId.setText("");
-        tfName.setText("");
-        tfPrice.setText("");
-        tfQty.setText("");
-        tfSearch.setText("");
-
-        if (cbBrand.getItemCount() > 0) cbBrand.setSelectedIndex(0);
-        if (cbColor.getItemCount() > 0) cbColor.setSelectedIndex(0);
-        if (cbType.getItemCount() > 0) cbType.setSelectedIndex(0);
-
-        table.clearSelection();
-    }
-
-    private void selectComboBoxValue(JComboBox<String> comboBox, String value) {
-        if (value == null || value.isBlank()) return;
-        for (int i = 0; i < comboBox.getItemCount(); i++) {
-            if (comboBox.getItemAt(i).equalsIgnoreCase(value)) {
-                comboBox.setSelectedIndex(i);
-                break;
-            }
-        }
-    }
-
-    // GETTERS
-    public JTextField getTfId() { return tfId; }
-    public JTextField getTfName() { return tfName; }
-    public JTextField getTfPrice() { return tfPrice; }
-    public JTextField getTfQty() { return tfQty; }
-    public JComboBox<String> getCbBrand() { return cbBrand; }
-    public JComboBox<String> getCbColor() { return cbColor; }
-    public JComboBox<String> getCbType() { return cbType; }
-    public JTextField getTfSearch() { return tfSearch; }
-    public JButton getBtnAddUpdate() { return btnAddUpdate; }
-    public JButton getBtnDelete() { return btnDelete; }
-    public JButton getBtnClear() { return btnClear; }
-    public JTable getTable() { return table; }
-    public JButton getBtnSearch() { return btnSearch; }
 }

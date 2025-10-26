@@ -1,5 +1,6 @@
 package LTBPaintCenter.view;
 
+import LTBPaintCenter.model.InventoryBatch;
 import LTBPaintCenter.model.Sale;
 import LTBPaintCenter.model.SaleItem;
 
@@ -7,15 +8,18 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Collection;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
 import java.util.List;
 
 /**
  * Monitoring panel for viewing sales records, applying filters,
  * and visualizing revenue breakdown by brand or type.
+ * Now also includes stock and expiration alerts.
  */
 public class MonitoringPanel extends JPanel {
+    // Existing components
     private final DefaultTableModel tableModel = new DefaultTableModel(
             new String[]{"Sale ID", "Date", "Items", "Total (₱)"}, 0
     ) {
@@ -44,6 +48,9 @@ public class MonitoringPanel extends JPanel {
 
     private List<Sale> currentSales;
 
+    // 🟢 NEW: Alerts Panel
+    private final JTextArea taAlerts = new JTextArea();
+
     public MonitoringPanel() {
         setLayout(new BorderLayout(8, 8));
         setBackground(Color.WHITE);
@@ -52,9 +59,10 @@ public class MonitoringPanel extends JPanel {
         initTopFilters();
         initTable();
         initSummaryBar();
+        initAlertsPanel(); // 🆕 Add alerts section
     }
 
-    // FILTER BAR
+    // FILTER BAR (unchanged)
     private void initTopFilters() {
         JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
         filterPanel.setBackground(Color.WHITE);
@@ -106,14 +114,13 @@ public class MonitoringPanel extends JPanel {
         cbYear.setSelectedItem(String.valueOf(currentYear));
     }
 
-    // SALES TABLE
+    // SALES TABLE (unchanged except showSaleDetailsDialog)
     private void initTable() {
         table.setRowHeight(26);
         table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
         table.setGridColor(new Color(230, 230, 230));
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-        // Zebra striping
         table.setDefaultRenderer(Object.class, new javax.swing.table.DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
@@ -128,7 +135,6 @@ public class MonitoringPanel extends JPanel {
         scroll.setBorder(BorderFactory.createTitledBorder("Recorded Sales"));
         add(scroll, BorderLayout.CENTER);
 
-        // 🟢 Add click listener for details
         table.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent e) {
@@ -141,7 +147,7 @@ public class MonitoringPanel extends JPanel {
         });
     }
 
-    // SUMMARY SECTION
+    // SUMMARY SECTION (mostly unchanged)
     private void initSummaryBar() {
         JPanel summaryContainer = new JPanel();
         summaryContainer.setLayout(new BoxLayout(summaryContainer, BoxLayout.Y_AXIS));
@@ -186,7 +192,64 @@ public class MonitoringPanel extends JPanel {
         parent.add(area);
     }
 
-    // PUBLIC
+    // 🆕 ALERTS SECTION
+    private void initAlertsPanel() {
+        JPanel alertsContainer = new JPanel(new BorderLayout());
+        alertsContainer.setBackground(Color.WHITE);
+        alertsContainer.setBorder(BorderFactory.createTitledBorder("⚠️ Stock & Expiration Alerts"));
+        alertsContainer.setPreferredSize(new Dimension(320, 0));
+
+        taAlerts.setEditable(false);
+        taAlerts.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        taAlerts.setBackground(new Color(255, 250, 240)); // Light beige
+        taAlerts.setForeground(Color.DARK_GRAY);
+        taAlerts.setLineWrap(true);
+        taAlerts.setWrapStyleWord(true);
+
+        JScrollPane scroll = new JScrollPane(taAlerts);
+        alertsContainer.add(scroll, BorderLayout.CENTER);
+
+        // Place alerts at EAST so it doesn't replace the SOUTH summary (which contains the bar chart)
+        add(alertsContainer, BorderLayout.EAST);
+    }
+
+    // 🟢 NEW: Update alerts with inventory data
+    public void updateAlerts(List<InventoryBatch> batches) {
+        StringBuilder sb = new StringBuilder();
+        LocalDate today = LocalDate.now();
+
+        for (InventoryBatch b : batches) {
+            LocalDate exp = b.getExpirationDate();
+            int qty = b.getQuantity();
+
+            if (exp != null) {
+                long daysLeft = ChronoUnit.DAYS.between(today, exp);
+                if (daysLeft <= 7 && daysLeft > 0) {
+                    sb.append("🟡 ").append(b.getName()).append(" (").append(b.getBrand()).append(")")
+                            .append(" — Expiring in ").append(daysLeft).append(" days\n");
+                } else if (daysLeft <= 0) {
+                    sb.append("🔴 ").append(b.getName()).append(" (").append(b.getBrand()).append(")")
+                            .append(" — EXPIRED!\n");
+                }
+            }
+
+            if (qty == 0) {
+                sb.append("⚫ ").append(b.getName()).append(" (").append(b.getBrand()).append(")")
+                        .append(" — OUT OF STOCK\n");
+            } else if (qty <= 5) {
+                sb.append("🟠 ").append(b.getName()).append(" (").append(b.getBrand()).append(")")
+                        .append(" — Low stock: ").append(qty).append(" left\n");
+            }
+        }
+
+        if (sb.length() == 0) {
+            sb.append("✅ All products are healthy and in stock.");
+        }
+
+        taAlerts.setText(sb.toString());
+    }
+
+    // SALES SUMMARY METHODS (unchanged)
     public void refreshSales(Collection<Sale> sales) {
         tableModel.setRowCount(0);
         double totalRevenue = 0;
@@ -217,30 +280,7 @@ public class MonitoringPanel extends JPanel {
         lblRevenue.setText(String.format("Total Revenue: ₱%.2f", totalRevenue));
     }
 
-    private void showSaleDetailsDialog(Sale sale) {
-        String[] columns = {"Product", "Qty", "Price (₱)", "Subtotal (₱)"};
-        DefaultTableModel detailsModel = new DefaultTableModel(columns, 0);
-        for (SaleItem it : sale.getItems()) {
-            detailsModel.addRow(new Object[]{
-                    it.getName(),
-                    it.getQty(),
-                    String.format("%.2f", it.getPrice()),
-                    String.format("%.2f", it.getSubtotal())
-            });
-        }
-
-        JTable detailsTable = new JTable(detailsModel);
-        detailsTable.setRowHeight(24);
-        JScrollPane scroll = new JScrollPane(detailsTable);
-
-        JOptionPane.showMessageDialog(
-                this,
-                scroll,
-                "Sale " + sale.getId() + " — Total: ₱" + String.format("%.2f", sale.getTotal()),
-                JOptionPane.INFORMATION_MESSAGE
-        );
-    }
-
+    // GETTERS
     public void populateBrandFilter(Collection<String> brands) {
         cbFilterBrand.removeAllItems();
         cbFilterBrand.addItem("All Brands");
@@ -252,16 +292,62 @@ public class MonitoringPanel extends JPanel {
         taTypeSummary.setText(typeText);
     }
 
-    // GETTERS
     public JButton getBtnApplyFilter() { return btnApplyFilter; }
     public JButton getBtnClearFilter() { return btnClearFilter; }
     public JComboBox<String> getCbFilterBrand() { return cbFilterBrand; }
-    public String getFromDay()   { return (String) cbFromDay.getSelectedItem(); }
-    public String getFromMonth() { return (String) cbFromMonth.getSelectedItem(); }
-    public String getFromYear()  { return (String) cbFromYear.getSelectedItem(); }
-    public String getToDay()     { return (String) cbToDay.getSelectedItem(); }
-    public String getToMonth()   { return (String) cbToMonth.getSelectedItem(); }
-    public String getToYear()    { return (String) cbToYear.getSelectedItem(); }
-    public BarChartPanel getBarChartPanel()   { return barChartPanel; }
+    public BarChartPanel getBarChartPanel() { return barChartPanel; }
     public JComboBox<String> getCbChartMode() { return cbChartMode; }
+
+    // Date selector getters used by MonitoringController
+    public String getFromDay() {
+        Object v = cbFromDay.getSelectedItem();
+        return v == null ? "" : v.toString();
+    }
+    public String getFromMonth() {
+        Object v = cbFromMonth.getSelectedItem();
+        return v == null ? "" : v.toString();
+    }
+    public String getFromYear() {
+        Object v = cbFromYear.getSelectedItem();
+        return v == null ? "" : v.toString();
+    }
+    public String getToDay() {
+        Object v = cbToDay.getSelectedItem();
+        return v == null ? "" : v.toString();
+    }
+    public String getToMonth() {
+        Object v = cbToMonth.getSelectedItem();
+        return v == null ? "" : v.toString();
+    }
+    public String getToYear() {
+        Object v = cbToYear.getSelectedItem();
+        return v == null ? "" : v.toString();
+    }
+
+    private void showSaleDetailsDialog(Sale sale) {
+        if (sale == null) return;
+
+        StringBuilder details = new StringBuilder();
+        details.append("Sale ID: ").append(sale.getId()).append("\n");
+        details.append("Date: ").append(sale.getDate()).append("\n");
+        details.append("Items:\n");
+
+        for (SaleItem item : sale.getItems()) {
+            details.append(" - ").append(item.getName())
+                    .append(" (x").append(item.getQty())
+                    .append("): ₱").append(String.format("%.2f", item.getSubtotal()))
+                    .append("\n");
+        }
+
+        details.append("\nTotal: ₱").append(String.format("%.2f", sale.getTotal()));
+
+        JOptionPane.showMessageDialog(
+                this,
+                new JTextArea(details.toString()),
+                "Sale Details",
+                JOptionPane.INFORMATION_MESSAGE
+        );
+    }
+    // 🆕 For updating alerts externally
+    public JTextArea getTaAlerts() { return taAlerts; }
 }

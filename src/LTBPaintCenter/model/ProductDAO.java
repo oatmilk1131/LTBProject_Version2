@@ -1,146 +1,174 @@
 package LTBPaintCenter.model;
 
 import java.sql.*;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ProductDAO {
 
-    public static int addProduct(Product p) throws SQLException {
-        String sql = "INSERT INTO products (name, price, quantity, brand, color, type) VALUES (?, ?, ?, ?, ?, ?)";
+    private static Product fromResultSet(ResultSet rs) throws SQLException {
+        // Map to current schema: inventory table uses qty, date_imported, expiration_date
+        LocalDate importedDate = readLocalDate(rs, "date_imported");
+        LocalDate expDate = readLocalDate(rs, "expiration_date");
+        Product p = new Product(
+                rs.getInt("id"),
+                rs.getString("name"),
+                rs.getDouble("price"),
+                rs.getInt("qty"),
+                rs.getString("brand"),
+                rs.getString("color"),
+                rs.getString("type"),
+                importedDate,
+                expDate,
+                rs.getString("status")
+        );
+        return p;
+    }
 
-        System.out.println("Writing to DB: " + new java.io.File("ltbpaintcenter.db").getAbsolutePath());
-
-        try (Connection conn = Database.getConnection()) {
-            conn.setAutoCommit(false); // ensure explicit commit
-            try (PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-
-                stmt.setString(1, p.getName());
-                stmt.setDouble(2, p.getPrice());
-                stmt.setInt(3, p.getQuantity());
-                stmt.setString(4, p.getBrand());
-                stmt.setString(5, p.getColor());
-                stmt.setString(6, p.getType());
-
-                int affected = stmt.executeUpdate();
-                if (affected == 0) {
-                    throw new SQLException("Inserting product failed, no rows affected.");
-                }
-
-                int newId;
-                try (ResultSet keys = stmt.getGeneratedKeys()) {
-                    if (keys.next()) {
-                        newId = keys.getInt(1);
-                        p.setId(newId);
-                    } else {
-                        throw new SQLException("Inserting product failed, no ID obtained.");
-                    }
-                }
-
-                conn.commit();
-                System.out.println("Product inserted: " + p.getName() + " (ID " + p.getId() + ")");
-                return p.getId();
-
-            } catch (SQLException e) {
-                conn.rollback();
-                throw e;
+    private static LocalDate readLocalDate(ResultSet rs, String column) throws SQLException {
+        Object val = rs.getObject(column);
+        if (val == null) return null;
+        if (val instanceof java.sql.Date d) {
+            return d.toLocalDate();
+        }
+        if (val instanceof Number n) {
+            long epochMillis = n.longValue();
+            return java.time.Instant.ofEpochMilli(epochMillis)
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toLocalDate();
+        }
+        String s = val.toString().trim();
+        if (s.isEmpty()) return null;
+        if (s.matches("\\d+")) {
+            try {
+                long epochMillis = Long.parseLong(s);
+                return java.time.Instant.ofEpochMilli(epochMillis)
+                        .atZone(java.time.ZoneId.systemDefault())
+                        .toLocalDate();
+            } catch (Exception ignored) {}
+        }
+        try {
+            if (s.length() >= 10) {
+                String d = s.substring(0, 10);
+                return LocalDate.parse(d);
+            }
+            return LocalDate.parse(s);
+        } catch (Exception e) {
+            try {
+                return java.sql.Date.valueOf(s).toLocalDate();
+            } catch (Exception ex) {
+                System.err.println("[ProductDAO] Failed to parse date in column '" + column + "': " + s);
+                return null;
             }
         }
     }
 
-    public static java.util.List<String> getDistinct(String columnName) {
-        java.util.List<String> list = new java.util.ArrayList<>();
-        String sql = "SELECT DISTINCT " + columnName + " FROM products " +
-                "WHERE " + columnName + " IS NOT NULL AND TRIM(" + columnName + ") <> '' " +
-                "ORDER BY " + columnName + " ASC";
-
+    public static List<Product> getAll() {
+        List<Product> list = new ArrayList<>();
+        String sql = "SELECT * FROM inventory ORDER BY name ASC";
         try (Connection conn = Database.getConnection();
-             java.sql.Statement stmt = conn.createStatement();
-             java.sql.ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                list.add(rs.getString(columnName));
-            }
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            while (rs.next()) list.add(fromResultSet(rs));
         } catch (Exception e) {
-            System.err.println("Failed to load distinct " + columnName + ": " + e.getMessage());
+            System.err.println("Failed to load products: " + e.getMessage());
         }
         return list;
     }
 
-    public static void updateProduct(Product product) throws SQLException {
-        String sql = "UPDATE products SET name=?, price=?, quantity=?, brand=?, color=?, type=? WHERE id=?";
+    public static List<Product> getAvailableForPOS() {
+        List<Product> list = new ArrayList<>();
+        String sql = "SELECT * FROM inventory";
+        try (Connection conn = Database.getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            LocalDate today = LocalDate.now();
+            while (rs.next()) {
+                Product p = fromResultSet(rs);
+                // Exclude expired (expiration <= today) and out-of-stock
+                if (p.getQuantity() > 0 && (p.getExpirationDate() == null || p.getExpirationDate().isAfter(today))) {
+                    list.add(p);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to load available products: " + e.getMessage());
+        }
+        return list;
+    }
+
+    // ✅ Add a new product batch
+    public static void add(Product p) {
+        String sql = "INSERT INTO inventory (name, brand, color, type, price, qty, date_imported, expiration_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = Database.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-            pstmt.setString(1, product.getName());
-            pstmt.setDouble(2, product.getPrice());
-            pstmt.setInt(3, product.getQuantity());
-            pstmt.setString(4, product.getBrand());
-            pstmt.setString(5, product.getColor());
-            pstmt.setString(6, product.getType());
-            pstmt.setInt(7, product.getId());
+            pstmt.setString(1, p.getName());
+            pstmt.setString(2, p.getBrand());
+            pstmt.setString(3, p.getColor());
+            pstmt.setString(4, p.getType());
+            pstmt.setDouble(5, p.getPrice());
+            pstmt.setInt(6, p.getQuantity());
+            pstmt.setDate(7, p.getDateImported() == null ? null : Date.valueOf(p.getDateImported()));
+            pstmt.setDate(8, p.getExpirationDate() == null ? null : Date.valueOf(p.getExpirationDate()));
+            pstmt.setString(9, p.getStatus());
 
             pstmt.executeUpdate();
+        } catch (Exception e) {
+            System.err.println("Failed to add product: " + e.getMessage());
         }
     }
 
-    public static void deleteProduct(int id) throws SQLException {
-        String sql = "DELETE FROM products WHERE id = ?";
+    public static void update(Product p) {
+        String sql = "UPDATE inventory SET name=?, brand=?, color=?, type=?, price=?, qty=?, date_imported=?, expiration_date=?, status=? WHERE id=?";
         try (Connection conn = Database.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, id);
-            stmt.executeUpdate();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, p.getName());
+            pstmt.setString(2, p.getBrand());
+            pstmt.setString(3, p.getColor());
+            pstmt.setString(4, p.getType());
+            pstmt.setDouble(5, p.getPrice());
+            pstmt.setInt(6, p.getQuantity());
+            pstmt.setDate(7, p.getDateImported() == null ? null : Date.valueOf(p.getDateImported()));
+            pstmt.setDate(8, p.getExpirationDate() == null ? null : Date.valueOf(p.getExpirationDate()));
+            pstmt.setString(9, p.getStatus());
+            pstmt.setInt(10, p.getId());
+
+            pstmt.executeUpdate();
+        } catch (Exception e) {
+            System.err.println("Failed to update product: " + e.getMessage());
         }
     }
 
+    public static void updateExpiredStatuses() {
+        String sql = "UPDATE inventory SET status='Expired' WHERE expiration_date IS NOT NULL AND expiration_date < DATE('now')";
+        try (Connection conn = Database.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(sql);
+        } catch (Exception e) {
+            System.err.println("Failed to mark expired products: " + e.getMessage());
+        }
+    }
 
-    public static List<Product> getAllProducts() {
-        List<Product> list = new ArrayList<>();
-        String sql = "SELECT id, name, price, quantity, brand, color, type FROM products ORDER BY id ASC";
+    public static List<Product> getAlerts() {
+        List<Product> alerts = new ArrayList<>();
+        String sql = "SELECT * FROM inventory WHERE " +
+                "(expiration_date BETWEEN DATE('now') AND DATE('now', '+7 day')) " +
+                "OR qty <= 5";
+
         try (Connection conn = Database.getConnection();
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
             while (rs.next()) {
-                Product p = new Product(
-                        rs.getInt("id"),
-                        rs.getString("name"),
-                        rs.getDouble("price"),
-                        rs.getInt("quantity"),
-                        rs.getString("brand"),
-                        rs.getString("color"),
-                        rs.getString("type")
-                );
-                list.add(p);
+                Product p = fromResultSet(rs);
+                alerts.add(p);
             }
-        } catch (SQLException e) {
-            System.err.println("Fetch failed: " + e.getMessage());
-            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println("Failed to get alerts: " + e.getMessage());
         }
-        return list;
-    }
 
-    public static Product getById(int id) {
-        String sql = "SELECT id, name, price, quantity, brand, color, type FROM products WHERE id=?";
-        try (Connection conn = Database.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            pstmt.setInt(1, id);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return new Product(
-                            rs.getInt("id"),
-                            rs.getString("name"),
-                            rs.getDouble("price"),
-                            rs.getInt("quantity"),
-                            rs.getString("brand"),
-                            rs.getString("color"),
-                            rs.getString("type")
-                    );
-                }
-            }
-        } catch (SQLException e) {
-            System.err.println("getById failed: " + e.getMessage());
-            e.printStackTrace();
-        }
-        return null;
+        return alerts;
     }
 }

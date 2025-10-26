@@ -8,7 +8,7 @@ import LTBPaintCenter.controller.MainController;
 
 public class App {
     public static void main(String[] args) {
-        LTBPaintCenter.model.DatabaseSetup.initialize();
+        LTBPaintCenter.model.DatabaseSetup.initializeDatabase();
         SwingUtilities.invokeLater(() -> new MainController());
     }
 }

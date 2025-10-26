@@ -2,9 +2,11 @@ package LTBPaintCenter.controller;
 
 import LTBPaintCenter.model.*;
 import LTBPaintCenter.view.MainFrame;
+import LTBPaintCenter.util.ReceiptPrinter;
 
 import javax.swing.*;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.List;
 
 // Main Controller — central hub connecting POS, Inventory, and Monitoring.
@@ -23,6 +25,11 @@ public class MainController {
         Global.inventory = inventory;
         Global.report = report;
 
+        // Load persisted sales before building views so Monitoring shows them
+        try {
+            report.loadFromDatabase();
+        } catch (Exception ignored) {}
+
         initializeControllers();
         initializeFrame();
 
@@ -38,7 +45,7 @@ public class MainController {
 
     private void initializeControllers() {
         posController = new POSController(inventory, report);
-        inventoryController = new InventoryController(inventory);
+        inventoryController = new InventoryController();
         monitoringController = new MonitoringController(report, inventory);
 
         Global.inventoryController = inventoryController;
@@ -57,13 +64,14 @@ public class MainController {
 
     private void loadProductsFromDatabase() {
         inventory.clear();
-        List<Product> dbProducts = ProductDAO.getAllProducts();
+        List<Product> dbProducts = ProductDAO.getAll();
         for (Product p : dbProducts) {
             inventory.addProduct(p);
         }
 
         inventoryController.refreshInventory();
-        posController.getView().refreshProducts(dbProducts);
+        // POS view expects batches, provide adapted collection
+        posController.getView().refreshProducts(inventory.getAllBatches());
         monitoringController.refresh();
     }
 
@@ -71,6 +79,14 @@ public class MainController {
         if (cart == null || cart.isEmpty()) {
             JOptionPane.showMessageDialog(frame, "Cart is empty");
             return false;
+        }
+
+        // Show checkout summary dialog with VATable, Non-VAT, Subtotal, VAT (12%), and TOTAL
+        java.awt.Frame owner = frame;
+        LTBPaintCenter.view.CheckoutDialog dialog = new LTBPaintCenter.view.CheckoutDialog(owner, cart);
+        dialog.setVisible(true);
+        if (!dialog.isConfirmed()) {
+            return false; // User cancelled
         }
 
         try {
@@ -84,7 +100,7 @@ public class MainController {
                 if (p != null) {
                     int newQty = Math.max(0, p.getQuantity() - item.getQty());
                     p.setQuantity(newQty);
-                    ProductDAO.updateProduct(p);
+                    ProductDAO.update(p);
                 }
             }
 
@@ -93,6 +109,30 @@ public class MainController {
             inventoryController.refreshInventory();
 
             loadProductsFromDatabase();
+
+            // Ask user to save a PDF receipt
+            int choice = JOptionPane.showConfirmDialog(frame, "Would you like to save the receipt as PDF?", "Save Receipt", JOptionPane.YES_NO_OPTION);
+            if (choice == JOptionPane.YES_OPTION) {
+                // Generate a reference number for the receipt and filename
+                String referenceNo = new java.text.SimpleDateFormat("yyyyMMddHHmmss").format(new java.util.Date()) +
+                        String.format("%03d", new java.util.Random().nextInt(1000));
+
+                JFileChooser chooser = new JFileChooser();
+                chooser.setDialogTitle("Save Receipt PDF");
+                chooser.setSelectedFile(new java.io.File("receipt_" + referenceNo + ".pdf"));
+                int res = chooser.showSaveDialog(frame);
+                if (res == JFileChooser.APPROVE_OPTION) {
+                    java.io.File f = chooser.getSelectedFile();
+                    String path = f.getAbsolutePath();
+                    if (!path.toLowerCase().endsWith(".pdf")) path += ".pdf";
+                    try {
+                        ReceiptPrinter.saveAsPDF(cart, path, referenceNo);
+                        JOptionPane.showMessageDialog(frame, "Receipt saved to: " + path);
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(frame, "Failed to save PDF: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            }
 
             JOptionPane.showMessageDialog(frame, "Sale recorded successfully!");
             return true;
@@ -105,9 +145,9 @@ public class MainController {
     }
 
     public static void seedData() {
-        DatabaseSetup.initialize();
+        DatabaseSetup.initializeDatabase();
 
-        List<Product> existing = ProductDAO.getAllProducts();
+        List<Product> existing = ProductDAO.getAll();
         if (!existing.isEmpty()) {
             System.out.println("Products already exist — skipping seed.");
             return;
@@ -116,20 +156,20 @@ public class MainController {
         System.out.println("Seeding default products into database...");
 
         try {
-            Product p1 = new Product(0, "LTB Acrylic Paint Red", 149.99, 50, "LTB", "Red", "Acrylic");
-            Product p2 = new Product(0, "LTB Enamel Paint Blue", 129.99, 30, "LTB", "Blue", "Enamel");
-            Product p3 = new Product(0, "LTB Latex Paint White", 99.99, 40, "LTB", "White", "Latex");
-            Product p4 = new Product(0, "LTB Primer Gray", 89.99, 25, "LTB", "Gray", "Primer");
-            Product p5 = new Product(0, "LTB Wood Stain Walnut", 129.50, 20, "LTB", "Brown", "Wood");
+            Product p1 = new Product(0, "LTB Acrylic Paint Red", 149.99, 50, "LTB", "Red", "Acrylic", LocalDate.now(), null, "Active");
+            Product p2 = new Product(0, "LTB Enamel Paint Blue", 129.99, 30, "LTB", "Blue", "Enamel", LocalDate.now(), null, "Active");
+            Product p3 = new Product(0, "LTB Latex Paint White", 99.99, 40, "LTB", "White", "Latex", LocalDate.now(), null, "Active");
+            Product p4 = new Product(0, "LTB Primer Gray", 89.99, 25, "LTB", "Gray", "Primer", LocalDate.now(), null, "Active");
+            Product p5 = new Product(0, "LTB Wood Stain Walnut", 129.50, 20, "LTB", "Brown", "Wood", LocalDate.now(), null, "Active");
 
-            ProductDAO.addProduct(p1);
-            ProductDAO.addProduct(p2);
-            ProductDAO.addProduct(p3);
-            ProductDAO.addProduct(p4);
-            ProductDAO.addProduct(p5);
+            ProductDAO.add(p1);
+            ProductDAO.add(p2);
+            ProductDAO.add(p3);
+            ProductDAO.add(p4);
+            ProductDAO.add(p5);
 
             System.out.println("Seed data inserted.");
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("Seeding failed: " + e.getMessage());
             e.printStackTrace();
         }
