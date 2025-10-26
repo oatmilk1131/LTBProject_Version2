@@ -455,6 +455,9 @@ public class POSPanel extends JPanel {
             lblVAT.setText(String.format("VAT (12%): ₱%.2f", vat.doubleValue()));
             lblTotal.setText(String.format("TOTAL: ₱%.2f", total.doubleValue()));
 
+            // Debug log to help diagnose user report
+            System.out.println("[DEBUG_LOG][POSPanel.updateTotal] subtotal=" + subtotal + ", vat=" + vat + ", total=" + total + ", cartSize=" + cart.size());
+
             // Ensure the UI reflects changes immediately
             java.awt.Container totalsParent = lblTotal.getParent();
             if (totalsParent != null) {
